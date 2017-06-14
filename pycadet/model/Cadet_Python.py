@@ -25,7 +25,7 @@ import io
 import matplotlib.pyplot as plt
 
 #location of the cadet binary
-cadet_location = "C:\\Users\\kosh_000\\cadet_build\\cadet_31\\cadet\\MS_SMKL_RELEASE\\bin\\cadet-cli.exe"
+cadet_location = "cadet-cli"
 
 # Helper functions that make it easier to set the values in the HDF5 file
 # In the CADET pdf file each value in the hdf5 file has a type. The functions

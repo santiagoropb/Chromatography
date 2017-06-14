@@ -1,0 +1,31 @@
+components:
+  0:
+    cref: 1.0
+    kads: 0.0
+    kdes: 0.0
+    qref: 1.0
+    sigma: 0.0
+    upsilon: 0.0
+  1:
+    cref: 1.0
+    kads: 35.5
+    kdes: 1000.0
+    qref: 1.0
+    sigma: 11.83
+    upsilon: 4.7
+  2:
+    cref: 1.0
+    kads: 1.59
+    kdes: 1000.0
+    qref: 1.0
+    sigma: 10.6
+    upsilon: 5.29
+  3:
+    cref: 1.0
+    kads: 7.7
+    kdes: 1000.0
+    qref: 1.0
+    sigma: 10.0
+    upsilon: 3.7
+scalar parameters:
+  lambda: 1200

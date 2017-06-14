@@ -31,6 +31,7 @@ class BindingModel(abc.ABC):
 
         # define default values for indexed parameters
         self._default_index_params = dict()
+        self._default_scalar_params = dict()
 
         # define scalar params container
         self._scalar_params = dict()
@@ -67,11 +68,11 @@ class BindingModel(abc.ABC):
         return len(self._scalar_params)
 
     @property
-    def num_indexed_parameters(self):
+    def num_index_parameters(self):
         """
         Returns number of indexed parameters
         """
-        return len(self._index_params)
+        return len(self._index_params.columns)
 
     @staticmethod
     def _parse_inputs(inputs):
@@ -101,7 +102,7 @@ class BindingModel(abc.ABC):
         """
 
     @abc.abstractmethod
-    def f_ads(self, comp_id, c_vars, q_vars, unfix_params=None, unfix_idx_param=None):
+    def f_ads(self, comp_id, c_vars, q_vars, scale_vars=False, unfix_params=None, unfix_idx_param=None):
         """
         
         :param comp_id: 
@@ -155,6 +156,9 @@ class BindingModel(abc.ABC):
             when parsing {}""".format(self._model_type)
             logger.debug(msg)
 
+        for k,val in self._default_scalar_params.items():
+            self._scalar_params[k] = val
+
     def _parse_components(self, args):
         """
         Parse components and indexed parameters
@@ -177,8 +181,8 @@ class BindingModel(abc.ABC):
                     logger.warning(msg)
                 self._components.add(comp_id)
         else:
-            logger.error("SMA no components found")
-            raise RuntimeError('SMA model needs to know the components')
+            logger.error(" No components found")
+            raise RuntimeError('The binding model needs to know the components')
 
         if len(self._components) == 0:
             msg = """No components specified 
@@ -186,10 +190,10 @@ class BindingModel(abc.ABC):
             logger.debug(msg)
 
         self._index_params = pd.DataFrame(index=self._components,
-                                            columns=self._registered_index_parameters)
+                                            columns=sorted(self._registered_index_parameters))
 
         # set defaults
-        for name, default in self._default_index_params:
+        for name, default in self._default_index_params.items():
             self._index_params[name] = default
 
         self._index_params.index.name = 'component id'
@@ -201,7 +205,7 @@ class BindingModel(abc.ABC):
                     msg = """{} is not a parameter
                     of model {}""".format(parameter, self._model_type)
                     assert parameter in self._registered_index_parameters, msg
-                    self._index_params[parameter][comp_id] = value
+                    self._index_params.set_value(comp_id, parameter, value)
         else:
             msg = """ No indexed parameters 
             specified when parsing {} """.format(self._model_type)
@@ -230,7 +234,7 @@ class BindingModel(abc.ABC):
             for i, cid in enumerate(comp_id):
                 if cid not in self._components:
                     raise RuntimeError("{} is not a component".format(cid))
-                self._index_params[name][cid] = value[i]
+                self._index_params.set_value(cid,name,value[i])
 
         elif (isinstance(value, list) or isinstance(value, tuple)) and \
                 (isinstance(name, list) or isinstance(name, tuple)) and \
@@ -244,7 +248,7 @@ class BindingModel(abc.ABC):
                     msg = """{} is not a parameter 
                     of model {}""".format(name, self._model_type)
                     raise RuntimeError(msg)
-                self._index_params[n][comp_id] = value[i]
+                self._index_params.set_value(comp_id, n, value[i])
 
         elif isinstance(comp_id, numbers.Integral) and \
                 isinstance(name, six.string_types) and \
@@ -252,7 +256,7 @@ class BindingModel(abc.ABC):
 
             if comp_id not in self._components:
                 raise RuntimeError("{} is not a component".format(comp_id))
-            self._index_params[name][comp_id] = value
+            self._index_params.set_value(comp_id, name, value)
 
         else:
             raise RuntimeError("input not recognized")
@@ -301,7 +305,7 @@ class BindingModel(abc.ABC):
                     self._index_params.reindex(self._index_params.index.union(tmp_list))
 
                 # set defaults
-                for name, default in self._default_index_params:
+                for name, default in self._default_index_params.items():
                     self._index_params[name] = default
 
                 self._components.update(tmp_list)
@@ -312,7 +316,7 @@ class BindingModel(abc.ABC):
                         self._index_params.reindex(self._index_params.index.union(tmp_list))
 
                     # set defaults
-                    for name, default in self._default_index_params:
+                    for name, default in self._default_index_params.items():
                         self._index_params[name] = default
 
                     self._components.update(tmp_list)
@@ -340,7 +344,7 @@ class BindingModel(abc.ABC):
                     self._index_params.reindex(self._index_params.index.union(not_overwritten))
 
                 # set defaults
-                for name, default in self._default_index_params:
+                for name, default in self._default_index_params.items():
                     self._index_params[name] = default
 
                 self._components.update(not_overwritten)
@@ -369,7 +373,7 @@ class BindingModel(abc.ABC):
                         self._index_params.reindex(self._index_params.index.union(to_add))
 
                     # set defaults
-                    for name, default in self._default_index_params:
+                    for name, default in self._default_index_params.items():
                         self._index_params[name] = default
 
                     self._components.update(to_add)
@@ -383,7 +387,7 @@ class BindingModel(abc.ABC):
                         msg = """"{} is not a parameter 
                                 of model {}""".format(name, self._model_type)
                         raise RuntimeError(msg)
-                    self._index_params[name][comp_id] = value
+                    self._index_params.set_value(comp_id, name, value)
 
             else:
                 raise RuntimeError("input not recognized")
@@ -403,39 +407,69 @@ class BindingModel(abc.ABC):
         """
         return list(self._components)
 
-    def get_scalar_parameters(self):
-        return copy.deepcopy(self._scalar_params)
+    def get_scalar_parameters(self, with_defaults=False):
+        if with_defaults:
+            return copy.deepcopy(self._scalar_params)
+        container = dict()
+        for n,v in self._scalar_params.items():
+            if n not in self._default_scalar_params.keys():
+                container[n] = v
+        return container
 
     def scalar_parameters(self):
         for n, v in self._scalar_params.items():
             yield n, v
 
+    def get_index_parameters_dict(self, with_defaults=False):
+        """
+        Returns index parameters
+        :return: Nested dictionary with index parameters
+        """
+        container = dict()
+        for cid in self._components:
+            container[cid] = dict()
+            for name in self._registered_index_parameters:
+                if with_defaults:
+                    container[cid][name] = self._index_params.get_value(cid, name)
+                else:
+                    if name not in self._default_index_params.keys():
+                        container[cid][name] = self._index_params.get_value(cid, name)
+        return container
+
+
 @BindingModel.register
 class SMAModel(BindingModel):
 
-    def __init__(self, inputs, comp_id_salt):
+    def __init__(self, inputs, comp_id_salt=0):
 
         # call parent binding model constructor
         super().__init__()
 
         # registers scalar paramenters
-        self._registered_scalar_parameters.add('Lambda')
+        self._registered_scalar_parameters.add('lambda')
+        self._registered_scalar_parameters.add('sma_cref')
+        self._registered_scalar_parameters.add('sma_qref')
 
         # registers indexed parameters
         self._registered_index_parameters.add('kads')
         self._registered_index_parameters.add('kdes')
         self._registered_index_parameters.add('upsilon')
         self._registered_index_parameters.add('sigma')
-        self._registered_index_parameters.add('refq')
-        self._registered_index_parameters.add('refc')
+        self._registered_index_parameters.add('qref')
+        self._registered_index_parameters.add('cref')
 
         # register defaults
-        self._default_index_params['refq'] = 1.0
-        self._default_index_params['refc'] = 1.0
+        self._default_index_params['qref'] = 1.0
+        self._default_index_params['cref'] = 1.0
+
+        # register defaults
+        self._default_scalar_params['sma_cref'] = 1.0
+        self._default_scalar_params['sma_qref'] = 1.0
 
         # parse inputs
         args = self._parse_inputs(inputs)
         self._parse_scalar_params(args)
+
         self._parse_components(args)
 
         # flags for model specification
@@ -444,11 +478,15 @@ class SMAModel(BindingModel):
 
         self._salt_id = comp_id_salt
 
+    @property
+    def salt_id(self):
+        return self._salt_id
+
     def is_salt(self, comp_id):
         assert comp_id in self._components
         return comp_id == self._salt_id
 
-    def f_ads(self, comp_id, c_vars, q_vars, unfix_params=None, unfix_idx_param=None):
+    def f_ads(self, comp_id, c_vars, q_vars, scale_vars=False, unfix_params=None, unfix_idx_param=None):
         """
         Computes adsorption function for component comp_id
         :param comp_id:
@@ -460,43 +498,46 @@ class SMAModel(BindingModel):
         if unfix_idx_param is not None or unfix_params is not None:
             raise NotImplementedError()
 
+        if scale_vars:
+            raise NotImplementedError()
+
         if not self.is_fully_specified():
-            print(self._index_params)
-            print(self._scalar_params)
             raise RuntimeError("Missing parameters")
 
         if self.is_salt(comp_id):
-            q_0 = self._scalar_params['Lambda']
+            q_0 = self._scalar_params['lambda']
             for cj in self._components:
                 if not self.is_salt(cj):
-                    vj = self._index_params['upsilon'][cj]
+                    vj = self._index_params.get_value(cj, 'upsilon')
                     q_0 -= vj * q_vars[cj]
             return q_0
         else:
-            q_0_bar = self._scalar_params['Lambda']
+            q_0_bar = self._scalar_params['lambda']
             for cj in self._components:
                 if not self.is_salt(cj):
-                    vj = self._index_params['upsilon'][cj]
-                    sj = self._index_params['sigma'][cj]
+                    vj = self._index_params.get_value(cj, 'upsilon')
+                    sj = self._index_params.get_value(cj, 'sigma')
                     q_0_bar -= (vj+sj)*q_vars[cj]
 
             # adsorption term
-            kads = self._index_params['kads'][comp_id]
-            vi = self._index_params['upsilon'][comp_id]
-            q_rf_salt = self._index_params['qref'][self._salt_id]
-            adsorption = kads*c_vars[comp_id]*(q_0_bar/q_rf_salt)**vi
+            kads = self._index_params.get_value(comp_id, 'kads')
+            vi = self._index_params.get_value(comp_id, 'upsilon')
+            q_rf_salt = self._scalar_params['sma_qref']
+            adsorption = kads * c_vars[comp_id] * (q_0_bar / q_rf_salt) ** vi
 
             # desorption term
-            kdes = self._index_params['kdes'][comp_id]
-            vi = self._index_params['upsilon'][comp_id]
-            c_rf_salt = self._index_params['cref'][self._salt_id]
-            desorption = kdes * q_vars[comp_id] * (c_vars[self._salt_id] / c_rf_salt) ** vi
+            kdes = self._index_params.get_value(comp_id, 'kdes')
+            c_rf_salt = self._scalar_params['sma_cref']
+            desorption = kdes * q_vars[comp_id] * (c_vars[self.salt_id] / c_rf_salt) ** vi
 
             return adsorption-desorption
 
     def is_fully_specified(self):
         has_nan = self._index_params.isnull().values.any()
-        return self._scalar_params.has_key('Lambda') and not has_nan
+        for k in self._registered_scalar_parameters:
+            if k not in self._scalar_params:
+                return False
+        return not has_nan
 
     def write_to_cadet_input_file(self, filename, unitname):
 
@@ -506,9 +547,16 @@ class SMAModel(BindingModel):
             raise RuntimeError("Missing parameters")
 
         with h5py.File(filename, 'a') as f:
-            subgroup_name = os.path.join(filename, "input", "model", unitname)
+            subgroup_name = os.path.join("input", "model", unitname)
+
+            if subgroup_name not in f:
+                f.create_group(subgroup_name)
             subgroup = f[subgroup_name]
-            adsorption = subgroup.create_group('adsorption')
+            if 'adsorption' in subgroup:
+                warnings.warn("Overwriting {}/{}".format(subgroup_name,'adsorption'))
+                adsorption = subgroup['adsorption']
+            else:
+                adsorption = subgroup.create_group('adsorption')
 
             pointer = np.array(self.is_kinetic, dtype='i')
             adsorption.create_dataset('IS_KINETIC',
@@ -534,7 +582,7 @@ class SMAModel(BindingModel):
                                           dtype='d')
 
             # scalar params
-            pointer = np.array(self._scalar_params['Lambda'], dtype='d')
+            pointer = np.array(self._scalar_params['lambda'], dtype='d')
             adsorption.create_dataset('SMA_LAMBDA',
                                       data=pointer,
                                       dtype='i')
