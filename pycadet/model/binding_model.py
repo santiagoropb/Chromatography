@@ -1,49 +1,34 @@
 from __future__ import print_function
-from enum import Enum
+from pycadet.model.registrar import Registrar
 import pandas as pd
 import numpy as np
-import collections
 import warnings
-import numbers
 import logging
-import yaml
 import h5py
-import copy
-import six
 import abc
 import os
 
 logger = logging.getLogger(__name__)
 
 
-class ModelType(Enum):
-    UNSPECIFIED = 0
-    SMA = 1
-    
-
 class BindingModel(abc.ABC):
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
 
-        # define registered params
         self._registered_scalar_parameters = set()
-        self._registered_index_parameters = set()
+        self._registered_sindex_parameters = set()
 
-        # define default values for indexed parameters
-        self._default_index_params = dict()
-        self._default_scalar_params = dict()
+        self._scalar_params = kwargs.pop('sparams', None)
+        self._sindex_params = kwargs.pop('iparamas', None)
 
-        # define scalar params container
-        self._scalar_params = dict()
-
-        # define components and component indexed parameters
-        self._components = set()
-        self._index_params = pd.DataFrame(index=self._components,
-                                            columns=self._registered_index_parameters)
+        # link to model
+        self._model = None
 
         # define type of model
-        self._model_type = ModelType.UNSPECIFIED
         self._is_kinetic = True
+
+        # define unit name
+        self._unit_name = 'unit_001' # by default is unit1 which is the column
 
     @property
     def is_kinetic(self):
@@ -52,47 +37,6 @@ class BindingModel(abc.ABC):
     @is_kinetic.setter
     def is_kinetic(self, value):
         self._is_kinetic = value
-
-    @property
-    def num_components(self):
-        """
-        Returns number of components in the binding model
-        """
-        return len(self._components)
-
-    @property
-    def num_scalar_parameters(self):
-        """
-        Returns number of scalar parameters
-        """
-        return len(self._scalar_params)
-
-    @property
-    def num_index_parameters(self):
-        """
-        Returns number of indexed parameters
-        """
-        return len(self._index_params.columns)
-
-    @staticmethod
-    def _parse_inputs(inputs):
-        """
-        Parse inputs
-        :param inputs: filename or dictionary with inputs to the binding model
-        :return: dictionary with parsed inputs
-        """
-        if isinstance(inputs, dict):
-            args = inputs
-        elif isinstance(inputs, six.string_types):
-            if ".yml" in inputs or ".yaml" in inputs:
-                with open(inputs, 'r') as f:
-                    args = yaml.load(f)
-            else:
-                raise RuntimeError('File format not implemented yet. Try .yml or .yaml')
-        else:
-            raise RuntimeError('inputs must be a dictionary or a file')
-
-        return args
 
     @abc.abstractmethod
     def write_to_cadet_input_file(self, filename, unitname):
@@ -112,7 +56,39 @@ class BindingModel(abc.ABC):
         :return: expression if pyomo variable or scalar value
         """
 
+    def _set_params(self):
 
+        if self._scalar_params is not None:
+            if not isinstance(self._scalar_params, dict):
+                raise RuntimeError('Scalar parameters need to be a dictionary')
+            for k in self._scalar_params.keys():
+                if k not in self._registered_scalar_parameters:
+                    msg = """Scalar parameter {} not recognize in 
+                                            binding model {}""".format(k, self.__class__.__name__)
+                    raise RuntimeError(msg)
+        else:
+            self._scalar_params = self._model._scalar_params
+
+        if self._sindex_params is not None:
+            if not isinstance(self._sindex_params, pd.DataFrame):
+                raise RuntimeError('Index parameters need to be a pandas dataframe')
+            # check if names are in model
+            for n in self._sindex_params.columns:
+                if n not in self._registered_sindex_parameters:
+                    msg = """Index parameter {} not recognize in 
+                    binding model {}""".format(n, self.__class__.__name__)
+                    raise RuntimeError(msg)
+
+            #TODO: verify sindex
+
+            as_list = sorted(self._sindex_params.index.tolist())
+            for i in range(len(as_list)):
+                idx = as_list.index(i)
+                as_list[i] = self._comp_id_to_name[idx]
+            self._sindex_params.index = as_list
+
+        else:
+            self._scalar_params = self._model._sindex_params
     #TODO: define if this is actually required
     #@abc.abstractmethod
     #def dqdt(self, comp_id, c_vars, q_vars, unfix_params=None, unfix_idx_param=None):
@@ -137,354 +113,40 @@ class BindingModel(abc.ABC):
     #    :return: expression if pyomo variable or scalar value
     #    """
 
-    def _parse_scalar_params(self, args):
-        """
-        Parse scalar parameters
-        :param args: distionary with parsed inputs
-        :return: None
-        """
+    def get_scalar_param(self, name):
+        if name not in self._registered_scalar_parameters:
+            raise RuntimeError('{} is not a parameter of model {}'.format(name, self.__class__.__name__))
+        return self._scalar_params[name]
 
-        sparams = args.get('scalar parameters')
-        if sparams is not None:
-            for name, val in sparams.items():
-                msg = """{} is not a scalar parameter 
-                of model {}""".format(name, self._model_type)
-                assert name in self._registered_scalar_parameters, msg
-                self._scalar_params[name] = val
-        else:
-            msg = """No scalar parameters specified 
-            when parsing {}""".format(self._model_type)
-            logger.debug(msg)
+    def get_index_param(self, comp_name, name):
+        cid = self._model.get_component_id(comp_name)
+        if name not in self._registered_sindex_parameters:
+            raise RuntimeError('{} is not a parameter of model {}'.format(name, self.__class__.__name__))
+        return self._sindex_params.get_value(cid, name)
 
-        for k,val in self._default_scalar_params.items():
-            self._scalar_params[k] = val
+    def set_scalar_param(self, name, value):
+        if name not in self._registered_scalar_parameters:
+            raise RuntimeError('{} is not a parameter of model {}'.format(name, self.__class__.__name__))
+        self._scalar_params[name] = value
 
-    def _parse_components(self, args):
-        """
-        Parse components and indexed parameters
-        :param args: dictionary with parsed inputs
-        :return: None
-        """
-        dict_comp = args.get('components')
-        has_params = False
-        if dict_comp is not None:
-
-            if isinstance(dict_comp, list):
-                to_loop = dict_comp
-            else:
-                to_loop = dict_comp.keys()
-                has_params = True
-
-            for comp_id in to_loop:
-                if comp_id in self._components:
-                    msg = "Component {} being overwritten".format(comp_id)
-                    logger.warning(msg)
-                self._components.add(comp_id)
-        else:
-            logger.error(" No components found")
-            raise RuntimeError('The binding model needs to know the components')
-
-        if len(self._components) == 0:
-            msg = """No components specified 
-            when parsing {}""".format(self._model_type)
-            logger.debug(msg)
-
-        self._index_params = pd.DataFrame(index=self._components,
-                                            columns=sorted(self._registered_index_parameters))
-
-        # set defaults
-        for name, default in self._default_index_params.items():
-            self._index_params[name] = default
-
-        self._index_params.index.name = 'component id'
-        self._index_params.columns.name = 'parameters'
-
-        if has_params:
-            for comp_id, params in dict_comp.items():
-                for parameter, value in params.items():
-                    msg = """{} is not a parameter
-                    of model {}""".format(parameter, self._model_type)
-                    assert parameter in self._registered_index_parameters, msg
-                    self._index_params.set_value(comp_id, parameter, value)
-        else:
-            msg = """ No indexed parameters 
-            specified when parsing {} """.format(self._model_type)
-            logger.debug(msg)
-
-    def set_component_indexed_param(self, comp_id, name, value):
-        """
-        Add parameter to component
-        :param comp_id: id for component
-        :param name: name of the parameter
-        :param value: real number
-        """
-
-        if (isinstance(comp_id, list) or isinstance(comp_id, tuple)) and \
-                (isinstance(value, list) or isinstance(value, tuple)) and \
-                isinstance(name, six.string_types):
-
-            if name not in self._registered_index_parameters:
-                msg = """{} is not a parameter 
-                of model {}""".format(name, self._model_type)
-                raise RuntimeError(msg)
-
-            if len(comp_id) != len(value):
-                raise RuntimeError("The arrays must be equal size")
-
-            for i, cid in enumerate(comp_id):
-                if cid not in self._components:
-                    raise RuntimeError("{} is not a component".format(cid))
-                self._index_params.set_value(cid,name,value[i])
-
-        elif (isinstance(value, list) or isinstance(value, tuple)) and \
-                (isinstance(name, list) or isinstance(name, tuple)) and \
-                isinstance(comp_id, numbers.Integral):
-
-            if comp_id not in self._components:
-                raise RuntimeError("{} is not a component".format(comp_id))
-
-            for i, n in enumerate(name):
-                if n not in self._registered_index_parameters:
-                    msg = """{} is not a parameter 
-                    of model {}""".format(name, self._model_type)
-                    raise RuntimeError(msg)
-                self._index_params.set_value(comp_id, n, value[i])
-
-        elif isinstance(comp_id, numbers.Integral) and \
-                isinstance(name, six.string_types) and \
-                (isinstance(value, six.string_types) or isinstance(value, numbers.Number)):
-
-            if comp_id not in self._components:
-                raise RuntimeError("{} is not a component".format(comp_id))
-            self._index_params.set_value(comp_id, name, value)
-
-        else:
-            raise RuntimeError("input not recognized")
-
-    def add_scalar_parameter(self, name, value):
-        """
-        Add scalar parameter to dict of parameters
-        :param name: name(s) of the parameter
-        :param value: real number(s)
-        :return: None
-        """
-        if isinstance(name, six.string_types):
-            assert name in self._registered_scalar_parameters
-            self._scalar_params[name] = value
-        elif (isinstance(name, list) or isinstance(name, tuple)) and \
-                (isinstance(value, list) or isinstance(value, tuple)):
-
-            for i, n in enumerate(name):
-                assert name in self._registered_scalar_parameters
-                self._scalar_params[n] = value[i]
-        else:
-            raise RuntimeError("input not recognized")
-
-    def set_scalar_parameter(self, name, value):
-
-        # TODO: rethink this
-        self.add_scalar_parameter(name, value)
-
-    def add_component(self, comp_id, parameters=None):
-        """
-        Add a component to binding model with its corresponding indexed parameters
-        :param comp_id: id for the component
-        :param parameters: dictionary with parameters
-        """
-        if parameters is None:
-            tmp_list = set()
-            if isinstance(comp_id, collections.Sequence):
-                for cid in comp_id:
-                    if cid not in self._components:
-                        tmp_list.add(cid)
-                    else:
-                        msg = """ignoring component {}.
-                        The component was already added""".format(cid)
-                        logger.warning(msg)
-                self._index_params = \
-                    self._index_params.reindex(self._index_params.index.union(tmp_list))
-
-                # set defaults
-                for name, default in self._default_index_params.items():
-                    self._index_params[name] = default
-
-                self._components.update(tmp_list)
-            else:
-                if comp_id not in self._components:
-                    tmp_list = {comp_id}
-                    self._index_params = \
-                        self._index_params.reindex(self._index_params.index.union(tmp_list))
-
-                    # set defaults
-                    for name, default in self._default_index_params.items():
-                        self._index_params[name] = default
-
-                    self._components.update(tmp_list)
-                else:
-                    msg = """ignoring component {}.
-                    The component was already added""".format(comp_id)
-                    logger.warning(msg)
-        else:
-
-            if isinstance(comp_id, collections.Sequence) and \
-                    isinstance(parameters, collections.Sequence):
-
-                assert len(comp_id) == len(parameters)
-                overwritten = set()
-                for i, cid in enumerate(comp_id):
-                    if not isinstance(parameters[i], dict):
-                        msg = """Parameters per component need to
-                        be provided in a dictionary"""
-                        raise RuntimeError(msg)
-                    if cid in self._components:
-                        overwritten.add(cid)
-
-                not_overwritten = self._components.difference(overwritten)
-                self._index_params = \
-                    self._index_params.reindex(self._index_params.index.union(not_overwritten))
-
-                # set defaults
-                for name, default in self._default_index_params.items():
-                    self._index_params[name] = default
-
-                self._components.update(not_overwritten)
-
-                for i, cid in enumerate(comp_id):
-                    params = parameters[i]
-                    for name, value in params.items():
-                        if name not in self._registered_index_parameters:
-                            msg = """"{} is not a parameter 
-                            of model {}""".format(name, self._model_type)
-                            raise RuntimeError(msg)
-                        self._index_params[name][cid] = value
-
-                if overwritten:
-                    for n in overwritten:
-                        msg = """Parameters of component {}.
-                                were overwritten""".format(n)
-                        warnings.warn(msg)
-
-            elif isinstance(comp_id, numbers.Integral) and \
-                    isinstance(parameters, dict):
-
-                if comp_id not in self._components:
-                    to_add = {comp_id}
-                    self._index_params = \
-                        self._index_params.reindex(self._index_params.index.union(to_add))
-
-                    # set defaults
-                    for name, default in self._default_index_params.items():
-                        self._index_params[name] = default
-
-                    self._components.update(to_add)
-                else:
-                    msg = """Parameters of component {}.
-                            were overwritten""".format(comp_id)
-                    warnings.warn(msg)
-
-                for name, value in parameters.items():
-                    if name not in self._registered_index_parameters:
-                        msg = """"{} is not a parameter 
-                                of model {}""".format(name, self._model_type)
-                        raise RuntimeError(msg)
-                    self._index_params.set_value(comp_id, name, value)
-
-            else:
-                raise RuntimeError("input not recognized")
-
-    def del_component(self, comp_id):
-        """
-        Removes component form binding model
-        :param comp_id: component id
-        :return: None
-        """
-        self._components.remove(comp_id)
-        self._index_params.drop(comp_id)
-
-    def list_component_ids(self):
-        """
-        Returns list of ids for components
-        """
-        return list(self._components)
-
-    def get_scalar_parameters(self, with_defaults=False):
-        if with_defaults:
-            return copy.deepcopy(self._scalar_params)
-        container = dict()
-        for n,v in self._scalar_params.items():
-            if n not in self._default_scalar_params.keys():
-                container[n] = v
-        return container
-
-    def scalar_parameters(self):
-        for n, v in self._scalar_params.items():
-            yield n, v
-
-    def get_index_parameters_dict(self, with_defaults=False):
-        """
-        Returns index parameters
-        :return: Nested dictionary with index parameters
-        """
-        container = dict()
-        for cid in self._components:
-            container[cid] = dict()
-            for name in self._registered_index_parameters:
-                if with_defaults:
-                    container[cid][name] = self._index_params.get_value(cid, name)
-                else:
-                    if name not in self._default_index_params.keys():
-                        container[cid][name] = self._index_params.get_value(cid, name)
-        return container
-
+    def set_index_param(self, comp_name, name, value):
+        cid = self._model.get_component_id(comp_name)
+        if name not in self._registered_sindex_parameters:
+            raise RuntimeError('{} is not a parameter of model {}'.format(name, self.__class__.__name__))
+        self._sindex_params.set_value(cid, name, value)
 
 @BindingModel.register
-class SMAModel(BindingModel):
+class SMABinding(BindingModel):
 
-    def __init__(self, inputs, comp_id_salt=0):
+    def __init__(self, *args, **kwargs):
 
         # call parent binding model constructor
-        super().__init__()
+        super().__init__(*args, **kwargs)
 
-        # registers scalar paramenters
-        self._registered_scalar_parameters.add('lambda')
-        self._registered_scalar_parameters.add('sma_cref')
-        self._registered_scalar_parameters.add('sma_qref')
-
-        # registers indexed parameters
-        self._registered_index_parameters.add('kads')
-        self._registered_index_parameters.add('kdes')
-        self._registered_index_parameters.add('upsilon')
-        self._registered_index_parameters.add('sigma')
-        self._registered_index_parameters.add('qref')
-        self._registered_index_parameters.add('cref')
-
-        # register defaults
-        self._default_index_params['qref'] = 1.0
-        self._default_index_params['cref'] = 1.0
-
-        # register defaults
-        self._default_scalar_params['sma_cref'] = 1.0
-        self._default_scalar_params['sma_qref'] = 1.0
-
-        # parse inputs
-        args = self._parse_inputs(inputs)
-        self._parse_scalar_params(args)
-
-        self._parse_components(args)
-
-        # flags for model specification
-        self._model_type = ModelType.SMA
-        self._is_kinetic = True
-
-        self._salt_id = comp_id_salt
-
-    @property
-    def salt_id(self):
-        return self._salt_id
-
-    def is_salt(self, comp_id):
-        assert comp_id in self._components
-        return comp_id == self._salt_id
+        self._registered_scalar_parameters = \
+            Registrar.adsorption_parameters['sma']['scalar']
+        self._registered_sindex_parameters = \
+            Registrar.adsorption_parameters['sma']['index']
 
     def f_ads(self, comp_id, c_vars, q_vars, scale_vars=False, unfix_params=None, unfix_idx_param=None):
         """

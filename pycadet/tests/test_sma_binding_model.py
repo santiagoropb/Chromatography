@@ -1,5 +1,7 @@
-from pycadet.model.binding_model import SMAModel, ModelType
+from pycadet.model.binding_model import SMABinding,BindingModel
+from pycadet.model.chromatograpy_model import GRModel
 from pycadet.utils.compare import equal_dictionaries
+from collections import OrderedDict
 import unittest
 import tempfile
 import yaml
@@ -8,155 +10,85 @@ import shutil
 import os
 
 
-class TestSMAModel(unittest.TestCase):
+class TestBindingModel(unittest.TestCase):
 
     def setUp(self):
 
         self.test_data = dict()
-        self.test_data['components'] = dict()
+        self.test_data['components'] = OrderedDict()
         self.test_data['scalar parameters'] = dict()
 
         comps = self.test_data['components']
         sparams = self.test_data['scalar parameters']
 
         # set scalar params
-        sparams['lambda'] = 1200
+        sparams['sma_lambda'] = 1200
 
         # components and index params
-        self.cname_to_id = dict()
-        self.cname_to_id['salt'] = 0
-        self.cname_to_id['lysozyme'] = 1
-        self.cname_to_id['cytochrome'] = 2
-        self.cname_to_id['ribonuclease'] = 3
+        comp_names = ['salt',
+                      'lysozyme',
+                      'cytochrome',
+                      'ribonuclease']
 
-        for cid in self.cname_to_id.values():
-            comps[cid] = dict()
+        for cname in comp_names:
+            comps[cname] = dict()
 
         # salt
-        cid = 0
-        comps[cid]['kads'] = 0.0
-        comps[cid]['kdes'] = 0.0
-        comps[cid]['upsilon'] = 0.0
-        comps[cid]['sigma'] = 0.0
+        cid = 'salt'
+        comps[cid]['sma_kads'] = 0.0
+        comps[cid]['sma_kdes'] = 0.0
+        comps[cid]['sma_nu'] = 0.0
+        comps[cid]['sma_sigma'] = 0.0
         comps[cid]['cref'] = 1.0
         comps[cid]['qref'] = 1.0
 
         # lysozyme
-        cid = 1
-        comps[cid]['kads'] = 35.5
-        comps[cid]['kdes'] = 1000.0
-        comps[cid]['upsilon'] = 4.7
-        comps[cid]['sigma'] = 11.83
+        cid = 'lysozyme'
+        comps[cid]['sma_kads'] = 35.5
+        comps[cid]['sma_kdes'] = 1000.0
+        comps[cid]['sma_nu'] = 4.7
+        comps[cid]['sma_sigma'] = 11.83
         comps[cid]['cref'] = 1.0
         comps[cid]['qref'] = 1.0
 
         # cytochrome
-        cid = 2
-        comps[cid]['kads'] = 1.59
-        comps[cid]['kdes'] = 1000.0
-        comps[cid]['upsilon'] = 5.29
-        comps[cid]['sigma'] = 10.6
+        cid = 'cytochrome'
+        comps[cid]['sma_kads'] = 1.59
+        comps[cid]['sma_kdes'] = 1000.0
+        comps[cid]['sma_nu'] = 5.29
+        comps[cid]['sma_sigma'] = 10.6
         comps[cid]['cref'] = 1.0
         comps[cid]['qref'] = 1.0
 
         # ribonuclease
-        cid = 3
-        comps[cid]['kads'] = 7.7
-        comps[cid]['kdes'] = 1000.0
-        comps[cid]['upsilon'] = 3.7
-        comps[cid]['sigma'] = 10.0
+        cid = 'ribonuclease'
+        comps[cid]['sma_kads'] = 7.7
+        comps[cid]['sma_kdes'] = 1000.0
+        comps[cid]['sma_nu'] = 3.7
+        comps[cid]['sma_sigma'] = 10.0
         comps[cid]['cref'] = 1.0
         comps[cid]['qref'] = 1.0
 
-        filename = 'sma_data.yml'
-        with open(filename, 'w') as outfile:
-            yaml.dump(self.test_data, outfile, default_flow_style=False)
-
-    def test_parsing_from_dict(self):
-        parsed = SMAModel._parse_inputs(self.test_data)
-        unparsed = self.test_data
-        self.assertTrue(equal_dictionaries(parsed, unparsed))
-
-    def test_parsing_from_yaml(self):
-        parsed = SMAModel._parse_inputs("sma_data.yml")
-        unparsed = self.test_data
-        self.assertTrue(equal_dictionaries(parsed, unparsed))
-
-    def test_parsing_scalar_params(self):
-        m = SMAModel(self.test_data)
-        self.assertEqual(m.num_scalar_parameters, 3)
-        parsed = m.get_scalar_parameters()
-        unparsed = self.test_data['scalar parameters']
-        self.assertTrue(equal_dictionaries(parsed, unparsed))
-
-    def test_parsing_components(self):
-        m = SMAModel(self.test_data)
-        parsed = m.get_index_parameters_dict(with_defaults=True)
-        unparsed = self.test_data['components']
-        self.assertTrue(equal_dictionaries(parsed, unparsed))
-
-    def test_del_component(self):
-        m = SMAModel(self.test_data)
-        m.del_component(2)
-        parsed = m.get_index_parameters_dict(with_defaults=True)
-        del self.test_data['components'][2]
-        unparsed = self.test_data['components']
-        self.assertTrue(equal_dictionaries(parsed, unparsed))
-
-    def test_set_component_indexed_param(self):
-        # TODO: improve this test
-        m = SMAModel(self.test_data)
-        m.set_component_indexed_param(1, 'kads', 777)
-        parsed = m.get_index_parameters_dict(with_defaults=True)
-        self.test_data['components'][1]['kads'] = 777
-        unparsed = self.test_data['components']
-        self.assertTrue(equal_dictionaries(parsed, unparsed))
-
-        # two parameters
-        m.set_component_indexed_param(1, ['kads', 'kdes'], [2, 3])
-        parsed = m.get_index_parameters_dict(with_defaults=True)
-        self.test_data['components'][1]['kads'] = 2
-        self.test_data['components'][1]['kdes'] = 3
-        unparsed = self.test_data['components']
-        self.assertTrue(equal_dictionaries(parsed, unparsed))
-
-    def test_add_component(self):
-        # TODO: improve this test
-        m = SMAModel(self.test_data)
-        m.add_component(4)
-        n_p = len(m._registered_index_parameters)
-        n_c = len(m._components)
-        self.assertEqual(n_p*n_c, m._index_params.size)
+        self.m = GRModel(self.test_data)
 
     def test_is_kinetic(self):
-        m = SMAModel(self.test_data)
-        self.assertTrue(m.is_kinetic)
-        m.is_kinetic = 0
-        self.assertFalse(m.is_kinetic)
+        GRM = self.m
+        GRM.binding = SMABinding(self.test_data)
+        self.assertTrue(GRM.binding.is_kinetic)
+        GRM.binding.is_kinetic = 0
+        self.assertFalse(GRM.binding.is_kinetic)
 
-    def test_num_components(self):
-        m = SMAModel(self.test_data)
-        self.assertEqual(4, m.num_components)
-
-    def test_num_index_params(self):
-        m = SMAModel(self.test_data)
-        self.assertEqual(6, m.num_index_parameters)
-
-    def test_is_salt(self):
-        m = SMAModel(self.test_data)
-        self.assertTrue(m.is_salt(0))
-        m = SMAModel(self.test_data, 1)
-        self.assertTrue(m.is_salt(1))
-        m = SMAModel(self.test_data, 2)
-        self.assertFalse(m.is_salt(1))
-
+    """
     def test_is_fully_specified(self):
-        m = SMAModel(self.test_data)
-        m.add_component([4, 5])
-        self.assertFalse(m.is_fully_specified())
-        m = SMAModel(self.test_data)
-        self.assertTrue(m.is_fully_specified())
+        GRM = self.m
+        GRM.binding = SMABinding(self.test_data)
+        #self.assertFalse(GRM.binding.is_fully_specified())
 
+        #GRM.binding = SMABinding(self.test_data)
+        #self.assertTrue(m.is_fully_specified())
+    """
+
+    """
     def test_f_ads(self):
 
         m = SMAModel(self.test_data)
@@ -205,7 +137,7 @@ class TestSMAModel(unittest.TestCase):
 
     def test_write_to_cadet(self):
 
-        m = SMAModel(self.test_data)
+        m = SMABinding(self.test_data)
 
         test_dir = tempfile.mkdtemp()
 
@@ -229,7 +161,7 @@ class TestSMAModel(unittest.TestCase):
             self.assertEqual(is_k, m.is_kinetic)
 
         shutil.rmtree(test_dir)
-
+    """
 
 
 

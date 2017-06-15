@@ -20,6 +20,15 @@ def equal_dictionaries(dic1, dic2):
                     return False
     return True
 
+
+def pprint_dict(d, indent=0):
+   for key, value in d.items():
+      print('\t' * indent + str(key))
+      if isinstance(value, dict):
+          pprint_dict(value, indent+1)
+      else:
+         print('\t' * (indent+1) + str(value))
+
 if __name__ == '__main__':
 
     d1 = {'a': {'b': {'cs': 10}, 'd': {'cs': 20}}}

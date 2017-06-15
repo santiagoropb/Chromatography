@@ -1,4 +1,5 @@
 from __future__ import print_function
+from pycadet.utils.parse_utils import parse_inputs
 import pandas as pd
 import numpy as np
 import logging
@@ -8,7 +9,7 @@ import six
 logger = logging.getLogger(__name__)
 
 
-class section(object):
+class Section(object):
 
     def __init__(self, inputs):
 
@@ -27,18 +28,7 @@ class section(object):
         :param inputs: filename or dictionary with inputs to the binding model
         :return: dictionary with parsed inputs
         """
-        if isinstance(inputs, dict):
-            args = inputs
-        elif isinstance(inputs, six.string_types):
-            if ".yml" in inputs or ".yaml" in inputs:
-                with open(inputs, 'r') as f:
-                    args = yaml.load(f)
-            else:
-                raise RuntimeError('File format not implemented yet. Try .yml or .yaml')
-        else:
-            raise RuntimeError('inputs must be a dictionary or a file')
-
-        return args
+        return parse_inputs(inputs)
 
     @property
     def num_components(self):
@@ -96,3 +86,4 @@ class section(object):
         else:
             msg = """ No coefficients specified when parsing section """
             logger.debug(msg)
+
