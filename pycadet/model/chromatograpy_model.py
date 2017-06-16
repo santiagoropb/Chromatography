@@ -8,6 +8,7 @@ import collections
 import warnings
 import logging
 import numbers
+import weakref
 import copy
 import six
 import abc
@@ -55,6 +56,11 @@ class ChromatographyModel(abc.ABC):
         if name not in self._comp_name_to_id.keys():
             return False
         if self._comp_name_to_id[name] == self._salt_id:
+            return True
+        return False
+
+    def is_salt_id(self,cid):
+        if cid == self._salt_id:
             return True
         return False
 
@@ -302,7 +308,7 @@ class ChromatographyModel(abc.ABC):
             else:
                 raise RuntimeError("input not recognized")
 
-    def set_index_param(self, comp_name, name, value):
+    def set_index_parameter(self, comp_name, name, value):
         """
         Add parameter to component
         :param comp_id: id for component
@@ -396,11 +402,14 @@ class ChromatographyModel(abc.ABC):
         self._components.remove(comp_id)
         self._sindex_params.drop(comp_id)
 
-    def list_component_names(self):
+    def list_components(self, ids=False):
         """
         Returns list of names for components
         """
-        return list(self._comp_name_to_id.keys())
+        if ids:
+            return list(self._comp_id_to_name.keys())
+        else:
+            return list(self._comp_name_to_id.keys())
 
     def get_scalar_parameters(self, with_defaults=False):
         """
@@ -420,7 +429,7 @@ class ChromatographyModel(abc.ABC):
         for n, v in self._scalar_params.items():
             yield n, v
 
-    def get_index_parameters_dict(self, with_defaults=False):
+    def get_index_parameters_dict(self, with_defaults=False, ids=False):
         """
         Returns index parameters
         :param with_defaults: flag indicating if default parameters must be included
@@ -428,7 +437,10 @@ class ChromatographyModel(abc.ABC):
         """
         container = dict()
         for cid in self._components:
-            cname = self._comp_id_to_name[cid]
+            if ids:
+                cname = cid
+            else:
+                cname = self._comp_id_to_name[cid]
             container[cname] = dict()
             for name in self._registered_sindex_parameters:
                 if with_defaults:
@@ -438,7 +450,7 @@ class ChromatographyModel(abc.ABC):
                         container[cname][name] = self._sindex_params.get_value(cid, name)
         return container
 
-    def get_sindex_parameters(self, with_defaults=False):
+    def get_index_parameters(self, with_defaults=False, ids=False):
         """
 
         :param with_defaults: flag indicating if default parameters must be included
@@ -451,22 +463,42 @@ class ChromatographyModel(abc.ABC):
         else:
             df = self._sindex_params.dropna(axis=1, how='all')
 
-        old_index = df.index
-        new_index = [self._comp_id_to_name[cid] for cid in old_index]
+        if not ids:
 
-        as_list = sorted(df.index.tolist())
-        for i in range(len(as_list)):
-            idx = as_list.index(i)
-            as_list[i] = self._comp_id_to_name[idx]
-        df.index = as_list
+            as_list = sorted(df.index.tolist())
+            for i in range(len(as_list)):
+                idx = as_list.index(i)
+                as_list[i] = self._comp_id_to_name[idx]
+            df.index = as_list
 
         return df
+
+    def get_scalar_parameter(self,name):
+        """
+
+        :param name: name of the scalar parameter
+        :return: value of scalar parameter
+        """
+
+        return self._scalar_params[name]
+
+    def get_index_parameter(self,comp_name,name):
+        """
+
+        :param comp_name: name of component
+        :param name:  name of index parameter
+        :return: value
+        """
+        cid = self._comp_name_to_id[comp_name]
+        return self._sindex_params.get(cid,name)
+
+    def get_component_id(self,name):
+        return self._comp_name_to_id[name]
 
     def __setattr__(self, name, value):
 
         if isinstance(value, BindingModel):
-            value._model = self
-            value._set_params()
+            value._model = weakref.ref(self)
             if len(self._binding_models) >= 1:
                 raise NotImplemented("Multiple binging models not supported yet")
             self._binding_models.append(value)

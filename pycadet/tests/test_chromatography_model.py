@@ -112,14 +112,14 @@ class TestChromatographyModel(unittest.TestCase):
     def test_set_sindex_param(self):
 
         m = GRModel(self.test_data)
-        m.set_index_param('lysozyme', 'sma_kads', 777)
+        m.set_index_parameter('lysozyme', 'sma_kads', 777)
         parsed = m.get_index_parameters_dict(with_defaults=True)
         self.test_data['components']['lysozyme']['sma_kads'] = 777
         unparsed = self.test_data['components']
         self.assertTrue(equal_dictionaries(parsed, unparsed))
 
         # two parameters
-        m.set_index_param('lysozyme', ['sma_kads', 'sma_kdes'], [2, 3])
+        m.set_index_parameter('lysozyme', ['sma_kads', 'sma_kdes'], [2, 3])
         parsed = m.get_index_parameters_dict(with_defaults=True)
         self.test_data['components']['lysozyme']['sma_kads'] = 2
         self.test_data['components']['lysozyme']['sma_kdes'] = 3
@@ -127,7 +127,7 @@ class TestChromatographyModel(unittest.TestCase):
         self.assertTrue(equal_dictionaries(parsed, unparsed))
 
         # two components
-        m.set_index_param(['salt','lysozyme'], 'sma_kads', [2, 3])
+        m.set_index_parameter(['salt','lysozyme'], 'sma_kads', [2, 3])
         parsed = m.get_index_parameters_dict(with_defaults=True)
         self.test_data['components']['salt']['sma_kads'] = 2
         self.test_data['components']['lysozyme']['sma_kads'] = 3
@@ -173,7 +173,7 @@ class TestChromatographyModel(unittest.TestCase):
         self.assertFalse(m.is_salt('blah'))
 
     """
-    def test_get_sindex_params(self):
+    def test_get_index_parameters(self):
         m = GRModel(self.test_data)
         df = m.get_sindex_parameters()
         print(m._sindex_params)

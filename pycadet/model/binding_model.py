@@ -3,6 +3,7 @@ from pycadet.model.registrar import Registrar
 import pandas as pd
 import numpy as np
 import warnings
+import weakref
 import logging
 import h5py
 import abc
@@ -18,9 +19,6 @@ class BindingModel(abc.ABC):
         self._registered_scalar_parameters = set()
         self._registered_sindex_parameters = set()
 
-        self._scalar_params = kwargs.pop('sparams', None)
-        self._sindex_params = kwargs.pop('iparamas', None)
-
         # link to model
         self._model = None
 
@@ -32,11 +30,21 @@ class BindingModel(abc.ABC):
 
     @property
     def is_kinetic(self):
+        self._check_model()
         return self._is_kinetic
 
     @is_kinetic.setter
     def is_kinetic(self, value):
+        self._check_model()
         self._is_kinetic = value
+
+    @property
+    def unit(self):
+        return self._unit_name
+
+    @unit.setter
+    def unit(self, unit_name):
+        self._unit_name = unit_name
 
     @abc.abstractmethod
     def write_to_cadet_input_file(self, filename, unitname):
@@ -46,49 +54,17 @@ class BindingModel(abc.ABC):
         """
 
     @abc.abstractmethod
-    def f_ads(self, comp_id, c_vars, q_vars, scale_vars=False, unfix_params=None, unfix_idx_param=None):
+    def f_ads(self, comp_name, c_vars, q_vars, **kwargs):
         """
         
-        :param comp_id: 
+        :param comp_name: name of component of interest
         :param c_vars: dictionary from comp_id to variable. Either value or pyomo variable
         :param q_vars: dictionary from comp_id to variable. Either value or pyomo variable
         :param unfix_params: dictionary from parameter name to variable. Either value or pyomo variable
         :return: expression if pyomo variable or scalar value
         """
 
-    def _set_params(self):
 
-        if self._scalar_params is not None:
-            if not isinstance(self._scalar_params, dict):
-                raise RuntimeError('Scalar parameters need to be a dictionary')
-            for k in self._scalar_params.keys():
-                if k not in self._registered_scalar_parameters:
-                    msg = """Scalar parameter {} not recognize in 
-                                            binding model {}""".format(k, self.__class__.__name__)
-                    raise RuntimeError(msg)
-        else:
-            self._scalar_params = self._model._scalar_params
-
-        if self._sindex_params is not None:
-            if not isinstance(self._sindex_params, pd.DataFrame):
-                raise RuntimeError('Index parameters need to be a pandas dataframe')
-            # check if names are in model
-            for n in self._sindex_params.columns:
-                if n not in self._registered_sindex_parameters:
-                    msg = """Index parameter {} not recognize in 
-                    binding model {}""".format(n, self.__class__.__name__)
-                    raise RuntimeError(msg)
-
-            #TODO: verify sindex
-
-            as_list = sorted(self._sindex_params.index.tolist())
-            for i in range(len(as_list)):
-                idx = as_list.index(i)
-                as_list[i] = self._comp_id_to_name[idx]
-            self._sindex_params.index = as_list
-
-        else:
-            self._scalar_params = self._model._sindex_params
     #TODO: define if this is actually required
     #@abc.abstractmethod
     #def dqdt(self, comp_id, c_vars, q_vars, unfix_params=None, unfix_idx_param=None):
@@ -113,27 +89,67 @@ class BindingModel(abc.ABC):
     #    :return: expression if pyomo variable or scalar value
     #    """
 
-    def get_scalar_param(self, name):
+    def get_scalar_parameter(self, name):
+        self._check_model()
         if name not in self._registered_scalar_parameters:
             raise RuntimeError('{} is not a parameter of model {}'.format(name, self.__class__.__name__))
-        return self._scalar_params[name]
+        return self._model().get_scalar_parameter(name)
 
-    def get_index_param(self, comp_name, name):
-        cid = self._model.get_component_id(comp_name)
+    def get_index_parameter(self, comp_name, name):
+        self._check_model()
         if name not in self._registered_sindex_parameters:
             raise RuntimeError('{} is not a parameter of model {}'.format(name, self.__class__.__name__))
-        return self._sindex_params.get_value(cid, name)
+        return self._model().get_index_parameter(comp_name, name)
 
-    def set_scalar_param(self, name, value):
+    def set_scalar_parameter(self, name, value):
+        self._check_model()
         if name not in self._registered_scalar_parameters:
             raise RuntimeError('{} is not a parameter of model {}'.format(name, self.__class__.__name__))
-        self._scalar_params[name] = value
+        self._model().set_scalar_parameter(name, value)
 
-    def set_index_param(self, comp_name, name, value):
-        cid = self._model.get_component_id(comp_name)
+    def set_index_parameter(self, comp_name, name, value):
+
+        self._check_model()
         if name not in self._registered_sindex_parameters:
             raise RuntimeError('{} is not a parameter of model {}'.format(name, self.__class__.__name__))
-        self._sindex_params.set_value(cid, name, value)
+        self._model().set_index_param(comp_name, name, value)
+
+    def get_scalar_parameters(self, with_defaults=False):
+        return self._model().get_scalar_parameters(with_defaults=with_defaults)
+
+    def get_index_parameters(self, ids=False):
+        return self._model().get_index_parameters(ids=ids)[list(self._registered_sindex_parameters)]
+
+    def _check_model(self):
+        if self._model is None:
+            msg = """Binding model not attached to a Chromatography model.
+                     When a binding model is created it must be attached to a Chromatography
+                     model e.g \\n m = GRModel() \\n m.binding = SMABinding(). Alternatively,
+                     call binding.set_model(m) to fix the problem"""
+            raise RuntimeError(msg)
+
+    def set_model(self, m):
+        """
+        Attach binding model to Chromatography model
+        :param m: model to attach binding
+        :return: None
+        """
+        if self._model is not None:
+            warnings.warn("Reseting Chromatography model")
+        self._model = weakref.ref(m)
+
+    def is_fully_specified(self):
+        self._check_model()
+        df = self.get_index_parameters()
+        has_nan = df.isnull().values.any()
+        for k in self._registered_scalar_parameters:
+            if k not in self.get_scalar_parameters(True).keys():
+                print("Missing scalar parameter {}".format(k))
+                return False
+
+        return not has_nan
+
+
 
 @BindingModel.register
 class SMABinding(BindingModel):
@@ -148,60 +164,72 @@ class SMABinding(BindingModel):
         self._registered_sindex_parameters = \
             Registrar.adsorption_parameters['sma']['index']
 
-    def f_ads(self, comp_id, c_vars, q_vars, scale_vars=False, unfix_params=None, unfix_idx_param=None):
+    def f_ads(self, comp_name, c_vars, q_vars, **kwargs):
         """
         Computes adsorption function for component comp_id
-        :param comp_id:
+        :param comp_id: name of component of interest
         :param c_vars: dictionary from comp_id to variable. Either value or pyomo variable
         :param q_vars: dictionary from comp_id to variable. Either value or pyomo variable
         :param unfix_params: dictionary from parameter name to variable. Either value or pyomo variable
         :return: expression if pyomo variable or scalar value
         """
-        if unfix_idx_param is not None or unfix_params is not None:
+        self._check_model()
+
+        unfixed_index_params = kwargs.pop('unfixed_index_params',None)
+        unfixed_scalar_params = kwargs.pop('unfixed_scalar_params',None)
+        scale_vars = kwargs.pop('scale_vars', None)
+        scalar_params = kwargs.pop('scalar_params', None)
+        index_params = kwargs.pop('index_params', None)
+
+        if scalar_params is not None or index_params is not None:
             raise NotImplementedError()
 
-        if scale_vars:
+        if unfixed_index_params is not None or unfixed_scalar_params is not None:
+            raise NotImplementedError()
+
+        if scale_vars is not None:
             raise NotImplementedError()
 
         if not self.is_fully_specified():
             raise RuntimeError("Missing parameters")
 
-        if self.is_salt(comp_id):
-            q_0 = self._scalar_params['lambda']
-            for cj in self._components:
-                if not self.is_salt(cj):
-                    vj = self._index_params.get_value(cj, 'upsilon')
+        _index_params = self.get_index_parameters(ids=True)
+        _scalar_params = self.get_scalar_parameters(with_defaults=True)
+
+        assert self._model().salt_name is not None, "Salt must be defined in chromatography model"
+
+        if self._model().is_salt(comp_name):
+            q_0 = _scalar_params['sma_lambda']
+            for cj in self._model().list_components(ids=True):
+                if not self._model().is_salt(cj):
+                    vj = _index_params.get_value(cj, 'sma_nu')
                     q_0 -= vj * q_vars[cj]
             return q_0
         else:
-            q_0_bar = self._scalar_params['lambda']
+            q_0_bar = _scalar_params['sma_lambda']
             for cj in self._components:
                 if not self.is_salt(cj):
-                    vj = self._index_params.get_value(cj, 'upsilon')
-                    sj = self._index_params.get_value(cj, 'sigma')
+                    vj = self._index_params.get_value(cj, 'sma_nu')
+                    sj = self._index_params.get_value(cj, 'sma_sigma')
                     q_0_bar -= (vj+sj)*q_vars[cj]
 
             # adsorption term
-            kads = self._index_params.get_value(comp_id, 'kads')
-            vi = self._index_params.get_value(comp_id, 'upsilon')
-            q_rf_salt = self._scalar_params['sma_qref']
+            comp_id = self._model().get_component_id(comp_name)
+            kads = _index_params.get_value(comp_id, 'sma_kads')
+            vi = _index_params.get_value(comp_id, 'sma_nu')
+            q_rf_salt = _scalar_params['sma_qref']
             adsorption = kads * c_vars[comp_id] * (q_0_bar / q_rf_salt) ** vi
 
             # desorption term
-            kdes = self._index_params.get_value(comp_id, 'kdes')
-            c_rf_salt = self._scalar_params['sma_cref']
+            kdes =  _index_params.get_value(comp_id, 'sma_kdes')
+            c_rf_salt = _scalar_params['sma_cref']
             desorption = kdes * q_vars[comp_id] * (c_vars[self.salt_id] / c_rf_salt) ** vi
 
             return adsorption-desorption
 
-    def is_fully_specified(self):
-        has_nan = self._index_params.isnull().values.any()
-        for k in self._registered_scalar_parameters:
-            if k not in self._scalar_params:
-                return False
-        return not has_nan
-
     def write_to_cadet_input_file(self, filename, unitname):
+
+        self._check_model()
 
         if not self.is_fully_specified():
             print(self._index_params)

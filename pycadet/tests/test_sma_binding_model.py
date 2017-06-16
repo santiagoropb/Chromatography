@@ -78,15 +78,18 @@ class TestBindingModel(unittest.TestCase):
         GRM.binding.is_kinetic = 0
         self.assertFalse(GRM.binding.is_kinetic)
 
-    """
+
     def test_is_fully_specified(self):
         GRM = self.m
         GRM.binding = SMABinding(self.test_data)
-        #self.assertFalse(GRM.binding.is_fully_specified())
+        GRM.add_component('chlorine')
+        self.assertFalse(GRM.binding.is_fully_specified())
 
-        #GRM.binding = SMABinding(self.test_data)
-        #self.assertTrue(m.is_fully_specified())
-    """
+        GRM = GRModel(self.test_data)
+        GRM.binding = SMABinding(self.test_data)
+        print(GRM.binding.get_index_parameters())
+        self.assertTrue(GRM.binding.is_fully_specified())
+
 
     """
     def test_f_ads(self):
