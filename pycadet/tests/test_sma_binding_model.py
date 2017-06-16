@@ -1,4 +1,4 @@
-from pycadet.model.binding_model import SMABinding,BindingModel
+from pycadet.model.binding_model import SMABinding
 from pycadet.model.chromatograpy_model import GRModel
 from pycadet.utils.compare import equal_dictionaries
 from collections import OrderedDict
@@ -25,12 +25,12 @@ class TestBindingModel(unittest.TestCase):
         sparams['sma_lambda'] = 1200
 
         # components and index params
-        comp_names = ['salt',
+        self.comp_names = ['salt',
                       'lysozyme',
                       'cytochrome',
                       'ribonuclease']
 
-        for cname in comp_names:
+        for cname in self.comp_names:
             comps[cname] = dict()
 
         # salt
@@ -73,99 +73,104 @@ class TestBindingModel(unittest.TestCase):
 
     def test_is_kinetic(self):
         GRM = self.m
-        GRM.binding = SMABinding(self.test_data)
+        GRM.binding = SMABinding()
         self.assertTrue(GRM.binding.is_kinetic)
         GRM.binding.is_kinetic = 0
         self.assertFalse(GRM.binding.is_kinetic)
 
-
     def test_is_fully_specified(self):
         GRM = self.m
-        GRM.binding = SMABinding(self.test_data)
+        GRM.binding = SMABinding()
         GRM.add_component('chlorine')
         self.assertFalse(GRM.binding.is_fully_specified())
 
         GRM = GRModel(self.test_data)
-        GRM.binding = SMABinding(self.test_data)
-        print(GRM.binding.get_index_parameters())
+        GRM.binding = SMABinding()
         self.assertTrue(GRM.binding.is_fully_specified())
 
-
-    """
     def test_f_ads(self):
+        GRM = self.m
+        GRM.binding = SMABinding()
+        m = GRM.binding
 
-        m = SMAModel(self.test_data)
+        GRM.salt = 'salt'
 
         c_vars = dict()
-        c_vars[0] = 1.0
-        c_vars[1] = 0.5
-        c_vars[2] = 0.5
-        c_vars[3] = 0.5
+        c_vars['salt'] = 1.0
+        c_vars['lysozyme'] = 0.5
+        c_vars['cytochrome'] = 0.5
+        c_vars['ribonuclease'] = 0.5
 
         q_vars = dict()
-        q_vars[0] = 1.0
-        q_vars[1] = 0.0
-        q_vars[2] = 0.0
-        q_vars[3] = 0.0
+        q_vars['salt'] = 1.0
+        q_vars['lysozyme'] = 0.0
+        q_vars['cytochrome'] = 0.0
+        q_vars['ribonuclease'] = 0.0
 
-        q0 = self.test_data['scalar parameters']['lambda']
+        q0 = self.test_data['scalar parameters']['sma_lambda']
 
-        for cid in range(1,4):
-            vi = self.test_data['components'][cid]['upsilon']
-            q0 -= vi*q_vars[cid]
+        for cname in self.comp_names:
+            if not GRM.is_salt(cname):
+                vi = self.test_data['components'][cname]['sma_nu']
+                q0 -= vi*q_vars[cname]
 
         q0_bar = q0
-        for cid in range(1,4):
-            si = self.test_data['components'][cid]['sigma']
-            q0_bar -= si * q_vars[cid]
+        for cname in self.comp_names:
+            if not GRM.is_salt(cname):
+                si = self.test_data['components'][cname]['sma_sigma']
+                q0_bar -= si * q_vars[cname]
 
         dqidt = dict()
         mdqidt = dict()
-        for cid in range(4):
-            mdqidt[cid] = m.f_ads(cid, c_vars, q_vars)
-            if cid == 0:
-                dqidt[cid] = q0
+        for cname in self.comp_names:
+            mdqidt[cname] = m.f_ads(cname, c_vars, q_vars)
+            if GRM.is_salt(cname):
+                dqidt[cname] = q0
             else:
 
-                vi = self.test_data['components'][cid]['upsilon']
-                kads = self.test_data['components'][cid]['kads']
-                ads = kads*c_vars[cid] * (q0_bar) ** vi
+                vi = self.test_data['components'][cname]['sma_nu']
+                kads = self.test_data['components'][cname]['sma_kads']
+                ads = kads*c_vars[cname] * (q0_bar) ** vi
 
-                kdes = self.test_data['components'][cid]['kdes']
-                des = kdes * q_vars[cid] * (c_vars[0]) ** vi
-                dqidt[cid] = ads - des
+                kdes = self.test_data['components'][cname]['sma_kdes']
+                des = kdes * q_vars[cname] * (c_vars[GRM.salt]) ** vi
+                dqidt[cname] = ads - des
 
-        for cid in range(4):
-            self.assertAlmostEqual(dqidt[cid],mdqidt[cid])
+        for cname in self.comp_names:
+            self.assertAlmostEqual(dqidt[cname], mdqidt[cname])
 
     def test_write_to_cadet(self):
-
-        m = SMABinding(self.test_data)
+        GRM = self.m
+        GRM.salt = 'salt'
+        GRM.binding = SMABinding()
+        m = GRM.binding
 
         test_dir = tempfile.mkdtemp()
 
         filename = os.path.join(test_dir, "sma_tmp.hdf5")
-        m.write_to_cadet_input_file(filename, 'unit_001')
+        unit = 'unit_001'
+        m.write_to_cadet_input_file(filename,unit)
 
         # read back and verify output
         with h5py.File(filename, 'r') as f:
-            params = {'kads': 'SMA_KA',
-                      'kdes': 'SMA_KD',
-                      'upsilon': 'SMA_NU',
-                      'sigma': 'SMA_SIGMA'}
+            params = {'sma_kads',
+                      'sma_kdes',
+                      'sma_nu',
+                      'sma_sigma'}
             # assumes salt is component 0
-            for p, name in params.items():
+            for p in params:
+                name = p.upper()
                 path = 'input/model/unit_001/adsorption/{}'.format(name)
-                for i,e in enumerate(f[path]):
-                    value = self.test_data['components'][i][p]
+                for i, e in enumerate(f[path]):
+                    comp_id = GRM._ordered_ids_for_cadet[i]
+                    comp_name = GRM._comp_id_to_name[comp_id]
+                    value = self.test_data['components'][comp_name][p]
                     self.assertEqual(value, e)
 
             is_k = f['input/model/unit_001/adsorption/IS_KINETIC'].value
             self.assertEqual(is_k, m.is_kinetic)
 
         shutil.rmtree(test_dir)
-    """
-
 
 
 if __name__ == '__main__':

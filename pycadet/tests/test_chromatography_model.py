@@ -38,8 +38,7 @@ class TestChromatographyModel(unittest.TestCase):
         comps[cid]['sma_kdes'] = 0.0
         comps[cid]['sma_nu'] = 0.0
         comps[cid]['sma_sigma'] = 0.0
-        comps[cid]['cref'] = 1.0
-        comps[cid]['qref'] = 1.0
+
 
         # lysozyme
         cid = 'lysozyme'
@@ -47,8 +46,6 @@ class TestChromatographyModel(unittest.TestCase):
         comps[cid]['sma_kdes'] = 1000.0
         comps[cid]['sma_nu'] = 4.7
         comps[cid]['sma_sigma'] = 11.83
-        comps[cid]['cref'] = 1.0
-        comps[cid]['qref'] = 1.0
 
         # cytochrome
         cid = 'cytochrome'
@@ -56,8 +53,6 @@ class TestChromatographyModel(unittest.TestCase):
         comps[cid]['sma_kdes'] = 1000.0
         comps[cid]['sma_nu'] = 5.29
         comps[cid]['sma_sigma'] = 10.6
-        comps[cid]['cref'] = 1.0
-        comps[cid]['qref'] = 1.0
 
         # ribonuclease
         cid = 'ribonuclease'
@@ -65,8 +60,7 @@ class TestChromatographyModel(unittest.TestCase):
         comps[cid]['sma_kdes'] = 1000.0
         comps[cid]['sma_nu'] = 3.7
         comps[cid]['sma_sigma'] = 10.0
-        comps[cid]['cref'] = 1.0
-        comps[cid]['qref'] = 1.0
+
 
     def test_parsing_from_dict(self):
         parsed = ChromatographyModel._parse_inputs(self.test_data)
@@ -96,7 +90,8 @@ class TestChromatographyModel(unittest.TestCase):
 
     def test_parsing_components(self):
         m = GRModel(self.test_data)
-        parsed = m.get_index_parameters_dict(with_defaults=True)
+        parsed = m.get_index_parameters(with_defaults=False,
+                                        form='dictionary')
         unparsed = self.test_data['components']
         self.assertTrue(equal_dictionaries(parsed, unparsed))
 
@@ -104,7 +99,8 @@ class TestChromatographyModel(unittest.TestCase):
     def test_del_component(self):
         m = GRModel(self.test_data)
         m.del_component('lysozyme')
-        parsed = m.get_index_parameters_dict(with_defaults=True)
+        parsed = m.get_index_parameters(with_defaults=False,
+                                        form='dictionary')
         del self.test_data['components']['lysozyme']
         unparsed = self.test_data['components']
         self.assertTrue(equal_dictionaries(parsed, unparsed))
@@ -113,14 +109,16 @@ class TestChromatographyModel(unittest.TestCase):
 
         m = GRModel(self.test_data)
         m.set_index_parameter('lysozyme', 'sma_kads', 777)
-        parsed = m.get_index_parameters_dict(with_defaults=True)
+        parsed = m.get_index_parameters(with_defaults=False,
+                                        form='dictionary')
         self.test_data['components']['lysozyme']['sma_kads'] = 777
         unparsed = self.test_data['components']
         self.assertTrue(equal_dictionaries(parsed, unparsed))
 
         # two parameters
         m.set_index_parameter('lysozyme', ['sma_kads', 'sma_kdes'], [2, 3])
-        parsed = m.get_index_parameters_dict(with_defaults=True)
+        parsed = m.get_index_parameters(with_defaults=False,
+                                        form='dictionary')
         self.test_data['components']['lysozyme']['sma_kads'] = 2
         self.test_data['components']['lysozyme']['sma_kdes'] = 3
         unparsed = self.test_data['components']
@@ -128,7 +126,8 @@ class TestChromatographyModel(unittest.TestCase):
 
         # two components
         m.set_index_parameter(['salt','lysozyme'], 'sma_kads', [2, 3])
-        parsed = m.get_index_parameters_dict(with_defaults=True)
+        parsed = m.get_index_parameters(with_defaults=False,
+                                        form='dictionary')
         self.test_data['components']['salt']['sma_kads'] = 2
         self.test_data['components']['lysozyme']['sma_kads'] = 3
         unparsed = self.test_data['components']
@@ -138,23 +137,22 @@ class TestChromatographyModel(unittest.TestCase):
         # TODO: improve this test to check lists
         m = GRModel(self.test_data)
         m.add_component('water')
-        n_p = len(m._registered_sindex_parameters)
         n_c = m.num_components
-        self.assertEqual(n_p * n_c, m._sindex_params.size)
+        df = len(m.get_index_parameters().index)
+        self.assertEqual(n_c, df)
 
         new_component = dict()
         new_component['sma_kads'] = 7.7
         new_component['sma_kdes'] = 1000.0
         new_component['sma_nu'] = 3.7
         new_component['sma_sigma'] = 10.0
-        new_component['cref'] = 1.0
-        new_component['qref'] = 1.0
 
         m = GRModel(self.test_data)
         m.add_component('buffer', new_component)
         self.test_data['components']['buffer'] = new_component
 
-        parsed = m.get_index_parameters_dict(with_defaults=True)
+        parsed = m.get_index_parameters(with_defaults=False,
+                                        form='dictionary')
         unparsed = self.test_data['components']
         self.assertTrue(equal_dictionaries(parsed, unparsed))
 
@@ -168,7 +166,7 @@ class TestChromatographyModel(unittest.TestCase):
 
     def test_is_salt(self):
         m = GRModel(self.test_data)
-        m.salt_name = 'salt'
+        m.salt = 'salt'
         self.assertTrue(m.is_salt('salt'))
         self.assertFalse(m.is_salt('blah'))
 

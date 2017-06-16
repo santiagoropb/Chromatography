@@ -1,6 +1,7 @@
 from __future__ import print_function
 from pycadet.model.registrar import Registrar
-from pycadet.model.binding_model import BindingModel, SMABinding
+from pycadet.model.binding_model import BindingModel
+from pycadet.model.section import Section
 from pycadet.utils import parse_utils
 from collections import OrderedDict
 import pandas as pd
@@ -39,28 +40,30 @@ class ChromatographyModel(abc.ABC):
                                            columns=self._registered_sindex_parameters)
         self._salt_id = -1
 
-        self._binding_models = list()
+        self._binding_models = dict()
+
+        self._sections = dict()
+
+        self._ordered_ids_for_cadet = list()
 
     @property
-    def salt_name(self):
+    def salt(self):
         if self._salt_id != -1:
-            return self._comp_id_to_name[self._salt_id]
+            name = self._comp_id_to_name[self._salt_id]
+            return name
         return None
 
-    @salt_name.setter
-    def salt_name(self, name):
+    @salt.setter
+    def salt(self, name):
         self._salt_id = self._comp_name_to_id[name]
+        self._ordered_ids_for_cadet.remove(self._salt_id)
+        self._ordered_ids_for_cadet.insert(0, self._salt_id)
 
     def is_salt(self, name):
 
         if name not in self._comp_name_to_id.keys():
             return False
         if self._comp_name_to_id[name] == self._salt_id:
-            return True
-        return False
-
-    def is_salt_id(self,cid):
-        if cid == self._salt_id:
             return True
         return False
 
@@ -136,6 +139,7 @@ class ChromatographyModel(abc.ABC):
         self._comp_name_to_id[name] = new_id
         self._comp_id_to_name[new_id] = name
         self._components.add(new_id)
+        self._ordered_ids_for_cadet.append(new_id)
 
     def _parse_components(self, args):
         """
@@ -401,6 +405,7 @@ class ChromatographyModel(abc.ABC):
         del self._comp_id_to_name[comp_id]
         self._components.remove(comp_id)
         self._sindex_params.drop(comp_id)
+        self._ordered_ids_for_cadet.remove(comp_id)
 
     def list_components(self, ids=False):
         """
@@ -425,55 +430,57 @@ class ChromatographyModel(abc.ABC):
                 container[n] = v
         return container
 
-    def scalar_parameters(self):
-        for n, v in self._scalar_params.items():
-            yield n, v
+    def scalar_parameters(self, with_defaults=False):
+        if with_defaults:
+            for n, v in self._scalar_params.items():
+                yield n, v
+        else:
+            for n, v in self._scalar_params.items():
+                if n not in self._default_scalar_params:
+                    yield n,v
 
-    def get_index_parameters_dict(self, with_defaults=False, ids=False):
-        """
-        Returns index parameters
-        :param with_defaults: flag indicating if default parameters must be included
-        :return: Nested dictionary with index parameters
-        """
-        container = dict()
-        for cid in self._components:
-            if ids:
-                cname = cid
-            else:
-                cname = self._comp_id_to_name[cid]
-            container[cname] = dict()
-            for name in self._registered_sindex_parameters:
-                if with_defaults:
-                    container[cname][name] = self._sindex_params.get_value(cid, name)
-                else:
-                    if name not in self._default_sindex_params.keys():
-                        container[cname][name] = self._sindex_params.get_value(cid, name)
-        return container
-
-    def get_index_parameters(self, with_defaults=False, ids=False):
+    def get_index_parameters(self, with_defaults=False, ids=False, form='dataframe'):
         """
 
         :param with_defaults: flag indicating if default parameters must be included
         :return: DataFrame with parameters indexed with components
         """
-        if not with_defaults:
-            defaults = {k for k in self._default_sindex_params.keys()}
-            df = self._sindex_params.drop(defaults, axis=1)
-            df.dropna(axis=1, how='all', inplace=True)
+        if form == 'dataframe':
+            if not with_defaults:
+                defaults = {k for k in self._default_sindex_params.keys()}
+                df = self._sindex_params.drop(defaults, axis=1)
+                df.dropna(axis=1, how='all', inplace=True)
+            else:
+                df = self._sindex_params.dropna(axis=1, how='all')
+
+            if not ids:
+
+                as_list = sorted(df.index.tolist())
+                for i in range(len(as_list)):
+                    idx = as_list.index(i)
+                    as_list[i] = self._comp_id_to_name[idx]
+                df.index = as_list
+
+            return df
+        elif form=='dictionary':
+            container = dict()
+            for cid in self._components:
+                if ids:
+                    cname = cid
+                else:
+                    cname = self._comp_id_to_name[cid]
+                container[cname] = dict()
+                for name in self._registered_sindex_parameters:
+                    if with_defaults:
+                        container[cname][name] = self._sindex_params.get_value(cid, name)
+                    else:
+                        if name not in self._default_sindex_params.keys():
+                            container[cname][name] = self._sindex_params.get_value(cid, name)
+            return container
         else:
-            df = self._sindex_params.dropna(axis=1, how='all')
+            raise RuntimeError('Form of output not recognized')
 
-        if not ids:
-
-            as_list = sorted(df.index.tolist())
-            for i in range(len(as_list)):
-                idx = as_list.index(i)
-                as_list[i] = self._comp_id_to_name[idx]
-            df.index = as_list
-
-        return df
-
-    def get_scalar_parameter(self,name):
+    def get_scalar_parameter(self, name):
         """
 
         :param name: name of the scalar parameter
@@ -482,7 +489,7 @@ class ChromatographyModel(abc.ABC):
 
         return self._scalar_params[name]
 
-    def get_index_parameter(self,comp_name,name):
+    def get_index_parameter(self, comp_name, name):
         """
 
         :param comp_name: name of component
@@ -492,16 +499,22 @@ class ChromatographyModel(abc.ABC):
         cid = self._comp_name_to_id[comp_name]
         return self._sindex_params.get(cid,name)
 
-    def get_component_id(self,name):
+    def get_component_id(self, name):
         return self._comp_name_to_id[name]
 
     def __setattr__(self, name, value):
 
+        # TODO: add warning if overwriting name
         if isinstance(value, BindingModel):
             value._model = weakref.ref(self)
-            if len(self._binding_models) >= 1:
-                raise NotImplemented("Multiple binging models not supported yet")
-            self._binding_models.append(value)
+            value.name = name
+            self._binding_models[name] = value
+
+        if isinstance(value, Section):
+            value._model = weakref.ref(self)
+            value.name = name
+            self._sections[name] = value
+
         super(ChromatographyModel, self).__setattr__(name, value)
 
 @ChromatographyModel.register

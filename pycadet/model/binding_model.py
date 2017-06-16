@@ -1,6 +1,6 @@
 from __future__ import print_function
 from pycadet.model.registrar import Registrar
-import pandas as pd
+from enum import Enum
 import numpy as np
 import warnings
 import weakref
@@ -10,6 +10,15 @@ import abc
 import os
 
 logger = logging.getLogger(__name__)
+
+
+class BindingType(Enum):
+
+    STERIC_MASS_ACTION = 0
+    UNDEFINED = 1
+
+    def __str__(self):
+        return "{}".format(self.name)
 
 
 class BindingModel(abc.ABC):
@@ -25,8 +34,11 @@ class BindingModel(abc.ABC):
         # define type of model
         self._is_kinetic = True
 
-        # define unit name
-        self._unit_name = 'unit_001' # by default is unit1 which is the column
+        # define binding type
+        self._binding_type = BindingType.UNDEFINED
+
+        # set name
+        self._name = None
 
     @property
     def is_kinetic(self):
@@ -39,15 +51,15 @@ class BindingModel(abc.ABC):
         self._is_kinetic = value
 
     @property
-    def unit(self):
-        return self._unit_name
+    def name(self):
+        return self._name
 
-    @unit.setter
-    def unit(self, unit_name):
-        self._unit_name = unit_name
+    @name.setter
+    def name(self, new_name):
+        self._name = new_name
 
     @abc.abstractmethod
-    def write_to_cadet_input_file(self, filename, unitname):
+    def write_to_cadet_input_file(self, filename, unitname, **kwargs):
         """
         Append binding model to cadet hdf5 input file
         :param filename: name of cadet hdf5 input file
@@ -125,18 +137,19 @@ class BindingModel(abc.ABC):
             msg = """Binding model not attached to a Chromatography model.
                      When a binding model is created it must be attached to a Chromatography
                      model e.g \\n m = GRModel() \\n m.binding = SMABinding(). Alternatively,
-                     call binding.set_model(m) to fix the problem"""
+                     call binding.attach_to_model(m, name) to fix the problem"""
             raise RuntimeError(msg)
 
-    def set_model(self, m):
+    def attach_to_model(self, m, name):
         """
         Attach binding model to Chromatography model
-        :param m: model to attach binding
+        :param m: Chromatography model to attach binding
+        :param name: name of binding model
         :return: None
         """
         if self._model is not None:
             warnings.warn("Reseting Chromatography model")
-        self._model = weakref.ref(m)
+        setattr(m, name, self)
 
     def is_fully_specified(self):
         self._check_model()
@@ -148,7 +161,6 @@ class BindingModel(abc.ABC):
                 return False
 
         return not has_nan
-
 
 
 @BindingModel.register
@@ -164,10 +176,12 @@ class SMABinding(BindingModel):
         self._registered_sindex_parameters = \
             Registrar.adsorption_parameters['sma']['index']
 
+        self._binding_type = BindingType.STERIC_MASS_ACTION
+
     def f_ads(self, comp_name, c_vars, q_vars, **kwargs):
         """
         Computes adsorption function for component comp_id
-        :param comp_id: name of component of interest
+        :param comp_name: name of component of interest
         :param c_vars: dictionary from comp_id to variable. Either value or pyomo variable
         :param q_vars: dictionary from comp_id to variable. Either value or pyomo variable
         :param unfix_params: dictionary from parameter name to variable. Either value or pyomo variable
@@ -175,14 +189,11 @@ class SMABinding(BindingModel):
         """
         self._check_model()
 
-        unfixed_index_params = kwargs.pop('unfixed_index_params',None)
-        unfixed_scalar_params = kwargs.pop('unfixed_scalar_params',None)
+        unfixed_index_params = kwargs.pop('unfixed_index_params', None)
+        unfixed_scalar_params = kwargs.pop('unfixed_scalar_params', None)
         scale_vars = kwargs.pop('scale_vars', None)
         scalar_params = kwargs.pop('scalar_params', None)
         index_params = kwargs.pop('index_params', None)
-
-        if scalar_params is not None or index_params is not None:
-            raise NotImplementedError()
 
         if unfixed_index_params is not None or unfixed_scalar_params is not None:
             raise NotImplementedError()
@@ -191,50 +202,72 @@ class SMABinding(BindingModel):
             raise NotImplementedError()
 
         if not self.is_fully_specified():
+            print(self.get_index_parameters())
+            raise RuntimeError("Missing parameters")
+
+        if scalar_params is not None or index_params is not None:
+            raise NotImplementedError()
+
+        if scalar_params is not None or index_params is not None:
+            raise NotImplementedError()
+
+        _index_params = self.get_index_parameters()
+        _scalar_params = self.get_scalar_parameters(with_defaults=True)
+
+        assert self._model().salt is not None, "Salt must be defined in chromatography model"
+
+        # get list components
+        components = self._model().list_components()
+        # determine if salt
+        is_salt = self._model().is_salt(comp_name)
+        salt_name = self._model().salt
+
+        if is_salt:
+            q_0 = _scalar_params['sma_lambda']
+            for cname in components:
+                if self._model().is_salt(comp_name):
+                    vj = _index_params.get_value(cname, 'sma_nu')
+                    q_0 -= vj * q_vars[cname]
+            return q_0
+        else:
+            q_0_bar = _scalar_params['sma_lambda']
+            for cname in components:
+                if self._model().is_salt(comp_name):
+                    vj = _index_params.get_value(cname, 'sma_nu')
+                    sj = _index_params.get_value(cname, 'sma_sigma')
+                    q_0_bar -= (vj+sj)*q_vars[cname]
+
+            # adsorption term
+            kads = _index_params.get_value(comp_name, 'sma_kads')
+            vi = _index_params.get_value(comp_name, 'sma_nu')
+            q_rf_salt = _scalar_params['sma_qref']
+            adsorption = kads * c_vars[comp_name] * (q_0_bar / q_rf_salt) ** vi
+
+            # desorption term
+            kdes = _index_params.get_value(comp_name, 'sma_kdes')
+            c_rf_salt = _scalar_params['sma_cref']
+            desorption = kdes * q_vars[comp_name] * (c_vars[salt_name] / c_rf_salt) ** vi
+
+            return adsorption-desorption
+
+    def write_to_cadet_input_file(self, filename, unitname, **kwargs):
+
+        self._check_model()
+
+        scalar_params = kwargs.pop('scalar_params', None)
+        index_params = kwargs.pop('index_params', None)
+
+        assert self._model().salt is not None, "Salt must be defined in chromatography model"
+
+        if scalar_params is not None or index_params is not None:
+            raise NotImplementedError()
+
+        if not self.is_fully_specified():
+            print(self.get_index_parameters())
             raise RuntimeError("Missing parameters")
 
         _index_params = self.get_index_parameters(ids=True)
         _scalar_params = self.get_scalar_parameters(with_defaults=True)
-
-        assert self._model().salt_name is not None, "Salt must be defined in chromatography model"
-
-        if self._model().is_salt(comp_name):
-            q_0 = _scalar_params['sma_lambda']
-            for cj in self._model().list_components(ids=True):
-                if not self._model().is_salt(cj):
-                    vj = _index_params.get_value(cj, 'sma_nu')
-                    q_0 -= vj * q_vars[cj]
-            return q_0
-        else:
-            q_0_bar = _scalar_params['sma_lambda']
-            for cj in self._components:
-                if not self.is_salt(cj):
-                    vj = self._index_params.get_value(cj, 'sma_nu')
-                    sj = self._index_params.get_value(cj, 'sma_sigma')
-                    q_0_bar -= (vj+sj)*q_vars[cj]
-
-            # adsorption term
-            comp_id = self._model().get_component_id(comp_name)
-            kads = _index_params.get_value(comp_id, 'sma_kads')
-            vi = _index_params.get_value(comp_id, 'sma_nu')
-            q_rf_salt = _scalar_params['sma_qref']
-            adsorption = kads * c_vars[comp_id] * (q_0_bar / q_rf_salt) ** vi
-
-            # desorption term
-            kdes =  _index_params.get_value(comp_id, 'sma_kdes')
-            c_rf_salt = _scalar_params['sma_cref']
-            desorption = kdes * q_vars[comp_id] * (c_vars[self.salt_id] / c_rf_salt) ** vi
-
-            return adsorption-desorption
-
-    def write_to_cadet_input_file(self, filename, unitname):
-
-        self._check_model()
-
-        if not self.is_fully_specified():
-            print(self._index_params)
-            print(self._scalar_params)
-            raise RuntimeError("Missing parameters")
 
         with h5py.File(filename, 'a') as f:
             subgroup_name = os.path.join("input", "model", unitname)
@@ -243,7 +276,7 @@ class SMABinding(BindingModel):
                 f.create_group(subgroup_name)
             subgroup = f[subgroup_name]
             if 'adsorption' in subgroup:
-                warnings.warn("Overwriting {}/{}".format(subgroup_name,'adsorption'))
+                warnings.warn("Overwriting {}/{}".format(subgroup_name, 'adsorption'))
                 adsorption = subgroup['adsorption']
             else:
                 adsorption = subgroup.create_group('adsorption')
@@ -254,28 +287,35 @@ class SMABinding(BindingModel):
                                       dtype='i')
 
             # adsorption ks
-            params = {'kads': 'SMA_KA',
-                      'kdes': 'SMA_KD',
-                      'upsilon': 'SMA_NU',
-                      'sigma': 'SMA_SIGMA'}
+            params = {'sma_kads',
+                      'sma_kdes',
+                      'sma_nu',
+                      'sma_sigma'}
 
-            for k, v in params.items():
-                param = list(self._index_params[k])
-                if self._salt_id != 0:
-                    tmp = param[0]
-                    param[0] = param[self._salt_id]
-                    param[self._salt_id] = tmp
+            salt_id = self._model()._salt_id
+            list_ids = self._model().list_components(ids=True)
+            num_components = self._model().num_components
+            for k in params:
+                cadet_name = k.upper()
+                param = _index_params[k]
+                pointer = np.zeros(num_components, dtype='d')
+                for i in list_ids:
+                    ordered_id = self._model()._ordered_ids_for_cadet.index(i)
+                    pointer[ordered_id] = param[i]
 
-                pointer = np.array(param, dtype='d')
-                adsorption.create_dataset(v,
+                adsorption.create_dataset(cadet_name,
                                           data=pointer,
                                           dtype='d')
 
             # scalar params
-            pointer = np.array(self._scalar_params['lambda'], dtype='d')
-            adsorption.create_dataset('SMA_LAMBDA',
+            param_name = 'sma_lambda'
+            pointer = np.array(_scalar_params[param_name], dtype='d')
+            adsorption.create_dataset(param_name.upper(),
                                       data=pointer,
                                       dtype='i')
+
+            # TODO: this can be moved to based class if some additional
+            # TODO: sets are added
 
 
 

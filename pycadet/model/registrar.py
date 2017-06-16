@@ -14,20 +14,27 @@ class Registrar(object):
     single_index_parameters = set()
     default_single_index_parameters = dict()
     # container with multi index parameters
+    # TODO: current design does not consider multi-index
+    # TODO: this is left as an extension
     multi_index_parameters = set()
     default_multi_index_parameters = dict()
 
+    # TODO: add dictionary with description of parameters
+
     #############################################
     # scaling parameters
-    single_index_parameters.add('qref')
-    single_index_parameters.add('cref')
     default_single_index_parameters['qref'] = 1.0
     default_single_index_parameters['cref'] = 1.0
 
+    default_single_index_parameters['c_init'] = 0.0
+    default_single_index_parameters['q_init'] = 0.0
+
+    for k in default_single_index_parameters.keys():
+        single_index_parameters.add(k)
     #############################################
     # ADSORPTION parameters
     # TODO: in the future move adsorption parameters
-    # to the multi_index set
+    # TODO: to the multi_index set
 
     ########## SMA
     adsorption_parameters = dict()

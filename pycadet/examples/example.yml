@@ -1,0 +1,23 @@
+components: !!python/object/apply:collections.OrderedDict
+- - - salt
+    - sma_kads: 0.0
+      sma_kdes: 0.0
+      sma_nu: 0.0
+      sma_sigma: 0.0
+  - - lysozyme
+    - sma_kads: 35.5
+      sma_kdes: 1000.0
+      sma_nu: 4.7
+      sma_sigma: 11.83
+  - - cytochrome
+    - sma_kads: 1.59
+      sma_kdes: 1000.0
+      sma_nu: 5.29
+      sma_sigma: 10.6
+  - - ribonuclease
+    - sma_kads: 7.7
+      sma_kdes: 1000.0
+      sma_nu: 3.7
+      sma_sigma: 10.0
+scalar parameters:
+  sma_lambda: 1200
