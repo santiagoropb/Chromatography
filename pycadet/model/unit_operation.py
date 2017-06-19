@@ -38,6 +38,7 @@ class UnitOperation(abc.ABC):
         # define unit internal id
         self._unit_id = None
 
+        self._sections = []
         # append sections
         if len(sections):
             self.add_section(sections)
@@ -45,6 +46,10 @@ class UnitOperation(abc.ABC):
     @property
     def num_components(self):
         return self._model().num_components
+
+    @property
+    def num_sections(self):
+        return len(self._sections)
 
     @abc.abstractmethod
     def write_to_cadet_input_file(self, filename, **kwargs):
@@ -66,9 +71,9 @@ class UnitOperation(abc.ABC):
 @UnitOperation.register
 class Inlet(UnitOperation):
 
-    def __init__(self, **kwargs):
+    def __init__(self, sections=[], **kwargs):
 
-        self.super().__init__(**kwargs)
+        self.super().__init__(sections=sections,**kwargs)
 
         # Define type of unit operation
         self._unit_type = UnitOperationType.INLET
@@ -84,62 +89,52 @@ class Inlet(UnitOperation):
 @UnitOperation.register
 class Column(UnitOperation):
 
-    def __init__(self, **kwargs):
+    def __init__(self, sections=[], **kwargs):
 
-
-        #self._axial_dispersion = kwargs.pop('Dax', np.nan)
-        self._length = kwargs.pop('length', np.nan)
-        self._par_porosity = kwargs.pop('particle_porosity', np.nan)
-        self._par_radius = kwargs.pop('particle_radius', np.nan)
-        self._col_porosity = kwargs.pop('column_porosity', np.nan)
-        #self._film_difussion = kwargs.pop('film_difussion')
-
-        self.super().__init__(**kwargs)
+        self.super().__init__(sections=sections, **kwargs)
 
         # Define type of unit operation
         self._unit_type = UnitOperationType.INLET
 
-        # initial concentrations
-        self._init_c = None
-        self._init_q = None
+        if self.num_sections > 0:
+            raise RuntimeError('Multiple sections per column not supported yet')
 
-    """
+
     @property
-    def Dax(self):
-        return self._axial_dispersion
+    def dispersion(self):
+        return self._model().get_scalar_parameter('col_dispersion')
 
-    @Dax.setter
-    def Dax(self, value):
-        self._axial_dispersion = value
-    """
+    @dispersion.setter
+    def dispersion(self, value):
+        self._model().set_scalar_parameter('col_dispersion', value)
 
     @property
     def length(self):
-        return self._length
+        return self._model().get_scalar_parameter('col_length')
 
     @length.setter
     def length(self, value):
-        self._length = value
+        self._model().set_scalar_parameter('col_length', value)
 
     @property
     def particle_porosity(self):
-        return self._par_porosity
+        return self._model().get_scalar_parameter('par_porosity')
 
     @particle_porosity.setter
     def particle_porosity(self, value):
-        self._par_porosity = value
+        self._model().set_scalar_parameter('par_porosity', value)
 
     @property
     def column_porosity(self):
-        return self._col_porosity
+        return self._model().get_scalar_parameter('col_porosity')
 
     @particle_porosity.setter
     def column_porosity(self, value):
-        self._col_porosity = value
+        self._model().set_scalar_parameter('par_porosity', value)
 
     @property
     def particle_radius(self):
-        return self._par_radius
+        return self._model().get_scalar_parameter('par_radius')
 
     @particle_porosity.setter
     def particle_radius(self, value):

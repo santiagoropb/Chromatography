@@ -26,11 +26,49 @@ class Registrar(object):
     default_single_index_parameters['qref'] = 1.0
     default_single_index_parameters['cref'] = 1.0
 
-    default_single_index_parameters['c_init'] = 0.0
-    default_single_index_parameters['q_init'] = 0.0
-
     for k in default_single_index_parameters.keys():
         single_index_parameters.add(k)
+
+    #############################################
+    # Column parameters
+    """
+    column_parameters = dict()
+    column_parameters['scalar'] = set()
+    column_parameters['index'] = set()
+
+    column_parameters['scalar'].add('col_length')
+    column_parameters['scalar'].add('col_porosity')
+    column_parameters['scalar'].add('par_porosity')
+    column_parameters['scalar'].add('par_radius')
+    column_parameters['scalar'].add('col_dispersion')
+    column_parameters['scalar'].add('velocity')
+
+    column_parameters['index'].add('init_c')
+    column_parameters['index'].add('init_pc')
+    column_parameters['index'].add('init_q')
+    column_parameters['index'].add('film_diffusion')
+    column_parameters['index'].add('par_diffusion')
+
+    column_parameters['scalar def'] = dict()
+
+    column_parameters['index def'] = dict()
+    column_parameters['index def']['init_c'] = 0.0
+    column_parameters['index def']['init_q'] = 0.0
+    column_parameters['index def']['init_cp'] = 0.0
+
+    for p in column_parameters['scalar']:
+        scalar_parameters.add(p)
+
+    for p in column_parameters['index']:
+        single_index_parameters.add(p)
+
+    for p, v in column_parameters['scalar def'].items():
+        default_scalar_parameters[p] = v
+
+    for p, v in column_parameters['index def'].items():
+        default_single_index_parameters[p] = v
+        
+    """
     #############################################
     # ADSORPTION parameters
     # TODO: in the future move adsorption parameters
@@ -71,5 +109,3 @@ class Registrar(object):
     for p, v in adsorption_parameters['sma']['index def'].items():
         default_scalar_parameters[p] = v
 
-    
-    

@@ -1,13 +1,18 @@
 from __future__ import print_function
 from pycadet.model.registrar import Registrar
+from pycadet.utils import parse_utils
+from pycadet.utils import pandas_utils as pd_utils
 from enum import Enum
 import numpy as np
 import warnings
 import weakref
+import pandas as pd
 import logging
 import h5py
+import copy
 import abc
 import os
+import six
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +31,28 @@ class BindingModel(abc.ABC):
     def __init__(self, *args, **kwargs):
 
         self._registered_scalar_parameters = set()
-        self._registered_sindex_parameters = set()
+        self._registered_index_parameters = set()
+
+        # define default values for indexed parameters
+        self._default_scalar_params = dict()
+        self._default_index_params = dict()
+
+        self._scalar_params = dict()
+        self._index_params = pd.DataFrame()
+
+        # set dictionary with inputs
+        inputs = kwargs.pop('inputs', None)
+        self._inputs = inputs
+        if inputs is not None:
+            self._inputs = self._parse_inputs(inputs)
 
         # link to model
         self._model = None
 
         # define type of model
         self._is_kinetic = True
+
+        self._components = set()
 
         # define binding type
         self._binding_type = BindingType.UNDEFINED
@@ -58,6 +78,91 @@ class BindingModel(abc.ABC):
     def name(self, new_name):
         self._name = new_name
 
+    @property
+    def num_components(self):
+        """
+        Returns number of components in the binding model
+        """
+        return len(self._components)
+
+    @property
+    def num_scalar_parameters(self):
+        """
+        Returns number of scalar parameters
+        """
+        return len(self.get_scalar_parameters(with_defaults=False))
+
+    @property
+    def num_index_parameters(self):
+        """
+        Returns number of indexed parameters (ignore default columns)
+        """
+        defaults = {k for k in self._default_index_params.keys()}
+
+        df = self._index_params.drop(sorted(defaults), axis=1)
+        df.dropna(axis=1, how='all', inplace=True)
+
+        return len(df.columns)
+
+    @staticmethod
+    def _parse_inputs(inputs):
+        """
+        Parse inputs
+        :param inputs: filename or dictionary with inputs to the binding model
+        :return: dictionary with parsed inputs
+        """
+        return parse_utils.parse_inputs(inputs)
+
+    def _parse_scalar_parameters(self):
+
+        if self._inputs is not None:
+            sparams = self._inputs.get('scalar parameters')
+            registered_inputs = self._registered_scalar_parameters
+            parsed = parse_utils.parse_scalar_inputs_from_dict(sparams,
+                                                               self.__class__.__name__,
+                                                               registered_inputs,
+                                                               logger)
+
+            for k, v in parsed.items():
+                self._scalar_params[k] = v
+        else:
+            msg = """ No inputs when _parse_scalar_parameters
+            was called in {}""".format(self.__class__.__name__)
+            logger.debug(msg)
+
+    def _parse_index_parameters(self):
+
+        if self._inputs is not None:
+            map_id = self._model()._comp_name_to_id
+            registered_inputs = self._registered_index_parameters
+            default_inputs = self._default_index_params
+            dict_inputs = self._inputs.get('index parameters')
+            self._index_params = parse_utils.parse_parameters_indexed_by_components(dict_inputs,
+                                                                                    map_id,
+                                                                                    registered_inputs,
+                                                                                    default_inputs)
+
+            for cid in self._index_params.index:
+                self._components.add(cid)
+
+        else:
+            msg = """ No inputs when _parse_index_parameters
+                    was called in {}""".format(self.__class__.__name__)
+            logger.debug(msg)
+
+    def add_component(self, name, parameters=None):
+
+        if not self._model().is_model_component(name):
+            msg = """{} is not a component of the 
+            chromatography model"""
+            raise RuntimeError(msg)
+
+        cid = self._model().get_component_id(name)
+        if cid not in self._components:
+            self._index_params = pd_utils.add_row_to_df(self._index_params,
+                                                        cid,
+                                                        parameters=parameters)
+
     @abc.abstractmethod
     def write_to_cadet_input_file(self, filename, unitname, **kwargs):
         """
@@ -75,7 +180,6 @@ class BindingModel(abc.ABC):
         :param unfix_params: dictionary from parameter name to variable. Either value or pyomo variable
         :return: expression if pyomo variable or scalar value
         """
-
 
     #TODO: define if this is actually required
     #@abc.abstractmethod
@@ -103,34 +207,108 @@ class BindingModel(abc.ABC):
 
     def get_scalar_parameter(self, name):
         self._check_model()
-        if name not in self._registered_scalar_parameters:
-            raise RuntimeError('{} is not a parameter of model {}'.format(name, self.__class__.__name__))
-        return self._model().get_scalar_parameter(name)
+        """
+
+        :param name: name of the scalar parameter
+        :return: value of scalar parameter
+        """
+        return self._scalar_params[name]
 
     def get_index_parameter(self, comp_name, name):
         self._check_model()
-        if name not in self._registered_sindex_parameters:
-            raise RuntimeError('{} is not a parameter of model {}'.format(name, self.__class__.__name__))
-        return self._model().get_index_parameter(comp_name, name)
+        """
+
+        :param comp_name: name of component
+        :param name:  name of index parameter
+        :return: value
+        """
+        cid = self._model().get_component_id(comp_name)
+        return self._index_params.get(cid, name)
 
     def set_scalar_parameter(self, name, value):
         self._check_model()
-        if name not in self._registered_scalar_parameters:
-            raise RuntimeError('{} is not a parameter of model {}'.format(name, self.__class__.__name__))
-        self._model().set_scalar_parameter(name, value)
+        """
+        set scalar parameter to dict of parameters
+        :param name: name(s) of the parameter
+        :param value: real number(s)
+        :return: None
+        """
+        if isinstance(name, six.string_types):
+            assert name in self._registered_scalar_parameters
+            self._scalar_params[name] = value
+        elif (isinstance(name, list) or isinstance(name, tuple)) and \
+                (isinstance(value, list) or isinstance(value, tuple)):
+            for i, n in enumerate(name):
+                assert name in self._registered_scalar_parameters
+                self._scalar_params[n] = value[i]
+        else:
+            raise RuntimeError("input not recognized")
 
     def set_index_parameter(self, comp_name, name, value):
 
         self._check_model()
-        if name not in self._registered_sindex_parameters:
+        if name not in self._registered_index_parameters:
             raise RuntimeError('{} is not a parameter of model {}'.format(name, self.__class__.__name__))
-        self._model().set_index_param(comp_name, name, value)
+        cid = self._model().get_component_id(comp_name)
+        pd_utils.set_value_in_df(self._index_params,
+                                 cid,
+                                 name,
+                                 value)
 
     def get_scalar_parameters(self, with_defaults=False):
-        return self._model().get_scalar_parameters(with_defaults=with_defaults)
+        """
 
-    def get_index_parameters(self, ids=False):
-        return self._model().get_index_parameters(ids=ids)[list(self._registered_sindex_parameters)]
+        :param with_defaults: flag indicating if default parameters must be included
+        :return: dictionary of scalar parameters
+        """
+        if with_defaults:
+            return copy.deepcopy(self._scalar_params)
+        container = dict()
+        for n, v in self._scalar_params.items():
+            if n not in self._default_scalar_params.keys():
+                container[n] = v
+        return container
+
+    def get_index_parameters(self, with_defaults=False, ids=False, form='dataframe'):
+        """
+
+                :param with_defaults: flag indicating if default parameters must be included
+                :return: DataFrame with parameters indexed with components
+                """
+        if form == 'dataframe':
+            if not with_defaults:
+                defaults = {k for k in self._default_index_params.keys()}
+                df = self._index_params.drop(defaults, axis=1)
+                df.dropna(axis=1, how='all', inplace=True)
+            else:
+                df = self._index_params.dropna(axis=1, how='all')
+
+            if not ids:
+
+                as_list = sorted(df.index.tolist())
+                for i in range(len(as_list)):
+                    idx = as_list.index(i)
+                    as_list[i] = self._model()._comp_id_to_name[idx]
+                df.index = as_list
+
+            return df
+        elif form == 'dictionary':
+            container = dict()
+            for cid in self._components:
+                if ids:
+                    cname = cid
+                else:
+                    cname = self._model()._comp_id_to_name[cid]
+                container[cname] = dict()
+                for name in self._registered_index_parameters:
+                    if with_defaults:
+                        container[cname][name] = self._index_params.get_value(cid, name)
+                    else:
+                        if name not in self._default_index_params.keys():
+                            container[cname][name] = self._index_params.get_value(cid, name)
+            return container
+        else:
+            raise RuntimeError('Form of output not recognized')
 
     def _check_model(self):
         if self._model is None:
@@ -150,6 +328,7 @@ class BindingModel(abc.ABC):
         if self._model is not None:
             warnings.warn("Reseting Chromatography model")
         setattr(m, name, self)
+        self._initialize_containers()
 
     def is_fully_specified(self):
         self._check_model()
@@ -162,6 +341,30 @@ class BindingModel(abc.ABC):
 
         return not has_nan
 
+    def _fill_containers(self):
+
+        # initialize containers
+        for k in self._registered_scalar_parameters:
+            if k not in self._scalar_params.keys():
+                self._scalar_params[k] = np.nan
+
+        if self._inputs is None:
+            self._index_params = pd.DataFrame(np.nan,
+                                              index=[],
+                                              columns=self._registered_index_parameters)
+
+        for k, v in self._default_scalar_params.items():
+            if not np.isnan(self._scalar_params[k]):
+                self._scalar_params[k] = v
+
+    def _initialize_containers(self):
+        self._parse_scalar_parameters()
+        self._parse_index_parameters()
+        self._fill_containers()
+        self._inputs = None
+
+    def help(self):
+        print("TODO")
 
 @BindingModel.register
 class SMABinding(BindingModel):
@@ -173,8 +376,16 @@ class SMABinding(BindingModel):
 
         self._registered_scalar_parameters = \
             Registrar.adsorption_parameters['sma']['scalar']
-        self._registered_sindex_parameters = \
+
+        self._registered_index_parameters = \
             Registrar.adsorption_parameters['sma']['index']
+
+        # set defaults
+        self._default_scalar_params = \
+            Registrar.adsorption_parameters['sma']['scalar def']
+
+        self._default_index_params = \
+            Registrar.adsorption_parameters['sma']['index def']
 
         self._binding_type = BindingType.STERIC_MASS_ACTION
 
@@ -192,8 +403,6 @@ class SMABinding(BindingModel):
         unfixed_index_params = kwargs.pop('unfixed_index_params', None)
         unfixed_scalar_params = kwargs.pop('unfixed_scalar_params', None)
         scale_vars = kwargs.pop('scale_vars', None)
-        scalar_params = kwargs.pop('scalar_params', None)
-        index_params = kwargs.pop('index_params', None)
 
         if unfixed_index_params is not None or unfixed_scalar_params is not None:
             raise NotImplementedError()
@@ -204,12 +413,6 @@ class SMABinding(BindingModel):
         if not self.is_fully_specified():
             print(self.get_index_parameters())
             raise RuntimeError("Missing parameters")
-
-        if scalar_params is not None or index_params is not None:
-            raise NotImplementedError()
-
-        if scalar_params is not None or index_params is not None:
-            raise NotImplementedError()
 
         _index_params = self.get_index_parameters()
         _scalar_params = self.get_scalar_parameters(with_defaults=True)
