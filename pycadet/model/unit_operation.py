@@ -22,9 +22,9 @@ class UnitOperationType(Enum):
 
 class UnitOperation(abc.ABC):
 
-    def __init__(self, **kwargs):
+    def __init__(self, sections=[], **kwargs):
 
-        sublist_components = kwargs.pop('components',None)
+        sublist_components = kwargs.pop('components', None)
         # Define type of unit operation
         self._unit_type = UnitOperationType.UNDEFINED
 
@@ -38,6 +38,10 @@ class UnitOperation(abc.ABC):
         # define unit internal id
         self._unit_id = None
 
+        # append sections
+        if len(sections):
+            self.add_section(sections)
+
     @property
     def num_components(self):
         return self._model().num_components
@@ -45,20 +49,33 @@ class UnitOperation(abc.ABC):
     @abc.abstractmethod
     def write_to_cadet_input_file(self, filename, **kwargs):
         """
-        Append UnitOperation model to cadet hdf5 input file
+        Append UnitOperation to cadet hdf5 input file
         :param filename: name of cadet hdf5 input file
         """
+
+    def add_section(self, section):
+        """
+
+        :param section: Chromatography model defined section
+        :return: None
+        """
+        self.num_components()
+        print("TODO")
 
 
 @UnitOperation.register
 class Inlet(UnitOperation):
 
-    def __init__(self):
-        print("TODO")
+    def __init__(self, **kwargs):
+
+        self.super().__init__(**kwargs)
+
+        # Define type of unit operation
+        self._unit_type = UnitOperationType.INLET
 
     def write_to_cadet_input_file(self, filename, **kwargs):
         """
-        Append UnitOperation model to cadet hdf5 input file
+        Append UnitOperation to cadet hdf5 input file
         :param filename: name of cadet hdf5 input file
         """
         print("TODO")
@@ -67,12 +84,74 @@ class Inlet(UnitOperation):
 @UnitOperation.register
 class Column(UnitOperation):
 
-    def __init__(self):
-        print("TODO")
+    def __init__(self, **kwargs):
+
+
+        #self._axial_dispersion = kwargs.pop('Dax', np.nan)
+        self._length = kwargs.pop('length', np.nan)
+        self._par_porosity = kwargs.pop('particle_porosity', np.nan)
+        self._par_radius = kwargs.pop('particle_radius', np.nan)
+        self._col_porosity = kwargs.pop('column_porosity', np.nan)
+        #self._film_difussion = kwargs.pop('film_difussion')
+
+        self.super().__init__(**kwargs)
+
+        # Define type of unit operation
+        self._unit_type = UnitOperationType.INLET
+
+        # initial concentrations
+        self._init_c = None
+        self._init_q = None
+
+    """
+    @property
+    def Dax(self):
+        return self._axial_dispersion
+
+    @Dax.setter
+    def Dax(self, value):
+        self._axial_dispersion = value
+    """
+
+    @property
+    def length(self):
+        return self._length
+
+    @length.setter
+    def length(self, value):
+        self._length = value
+
+    @property
+    def particle_porosity(self):
+        return self._par_porosity
+
+    @particle_porosity.setter
+    def particle_porosity(self, value):
+        self._par_porosity = value
+
+    @property
+    def column_porosity(self):
+        return self._col_porosity
+
+    @particle_porosity.setter
+    def column_porosity(self, value):
+        self._col_porosity = value
+
+    @property
+    def particle_radius(self):
+        return self._par_radius
+
+    @particle_porosity.setter
+    def particle_radius(self, value):
+        self._par_radius = value
+
+
+
+
 
     def write_to_cadet_input_file(self, filename, **kwargs):
         """
-        Append UnitOperation model to cadet hdf5 input file
+        Append UnitOperationn to cadet hdf5 input file
         :param filename: name of cadet hdf5 input file
         """
         print("TODO")
@@ -90,5 +169,22 @@ class Outlet(UnitOperation):
         """
         print("TODO")
 
+
+@UnitOperation.register
+class Outlet(UnitOperation):
+
+    def __init__(self, **kwargs):
+
+        self.super().__init__(**kwargs)
+
+        # Define type of unit operation
+        self._unit_type = UnitOperationType.OUTLET
+
+    def write_to_cadet_input_file(self, filename, **kwargs):
+        """
+        Append UnitOperation to cadet hdf5 input file
+        :param filename: name of cadet hdf5 input file
+        """
+        print("TODO")
 
 

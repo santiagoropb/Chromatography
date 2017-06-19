@@ -2,6 +2,7 @@ from __future__ import print_function
 from pycadet.model.registrar import Registrar
 from pycadet.model.binding_model import BindingModel
 from pycadet.model.section import Section
+from pycadet.model.unit_operation import UnitOperation
 from pycadet.utils import parse_utils
 from collections import OrderedDict
 import pandas as pd
@@ -43,6 +44,8 @@ class ChromatographyModel(abc.ABC):
         self._binding_models = dict()
 
         self._sections = dict()
+
+        self._units = list()
 
         self._ordered_ids_for_cadet = list()
 
@@ -504,16 +507,21 @@ class ChromatographyModel(abc.ABC):
 
     def __setattr__(self, name, value):
 
-        # TODO: add warning if overwriting name
+        # TODO: add warning if overwriting name?
         if isinstance(value, BindingModel):
             value._model = weakref.ref(self)
             value.name = name
-            self._binding_models[name] = value
+            self._binding_models[name] = weakref.ref(value)
 
         if isinstance(value, Section):
             value._model = weakref.ref(self)
             value.name = name
-            self._sections[name] = value
+            self._sections[name] = weakref.ref(value)
+
+        if isinstance(value, UnitOperation):
+            value._model = weakref.ref(self)
+            value._unit_id = len(self._units)
+            self._units[value._unit_id] = weakref.ref(value)
 
         super(ChromatographyModel, self).__setattr__(name, value)
 
