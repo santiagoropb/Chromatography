@@ -42,7 +42,7 @@ class DataManager(object):
         # set name
         self._name = None
 
-        #super().__init__()
+        super().__init__()
 
     @property
     def name(self):

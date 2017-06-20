@@ -1,15 +1,13 @@
 from __future__ import print_function
-from pycadet.utils import pandas_utils as pd_utils
 from pycadet.model.data_manager import DataManager
+from pycadet.model.binding_model import BindingModel
 from pycadet.model.registrar import Registrar
+from pycadet.model.section import Section
 from enum import Enum
-from pycadet.utils import parse_utils
 import pandas as pd
 import numpy as np
-import warnings
 import logging
 import h5py
-import copy
 import abc
 import six
 import os
@@ -22,6 +20,13 @@ class UnitOperationType(Enum):
     COLUMN = 1
     OUTLET = 2
     UNDEFINED = 3
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+
+class InletType(Enum):
+    PIECEWISE_CUBIC_POLY = 0
 
     def __str__(self):
         return "{}".format(self.name)
@@ -71,14 +76,29 @@ class UnitOperation(DataManager, abc.ABC):
         :param filename: name of cadet hdf5 input file
         """
 
-    def add_section(self, section):
+    def add_section(self, name):
         """
 
         :param section: Chromatography model defined section
         :return: None
         """
-        self.num_components
-        print("TODO")
+        if isinstance(name, six.string_types):
+            if hasattr(self._model(), name):
+                self._sections.append(name)
+            else:
+                msg = """"{} is not a section of 
+                        the chromatogrphy model""".format(name)
+                raise RuntimeError(msg)
+        elif isinstance(name, Section):
+            section = name.name
+            if hasattr(self._model(), section):
+                self._sections.append(section)
+            else:
+                msg = """"{} is not a section of 
+                            the chromatogrphy model""".format(section)
+                raise RuntimeError(msg)
+        else:
+            raise RuntimeError("input not recognized")
 
 
 @UnitOperation.register
@@ -93,13 +113,46 @@ class Inlet(UnitOperation):
         # Define type of unit operation
         self._unit_type = UnitOperationType.INLET
 
+        # Define type inlet
+        self._inlet_type = InletType.PIECEWISE_CUBIC_POLY
+
     def write_to_cadet_input_file(self, filename, **kwargs):
         """
-        Append UnitOperation to cadet hdf5 input file
+        Append inlet to cadet hdf5 input file
         :param filename: name of cadet hdf5 input file
         """
-        print("TODO")
+        self._check_model()
+        if not self.is_fully_specified():
+            print(self.get_index_parameters())
+            raise RuntimeError("Missing parameters")
 
+        unitname = str(self._unit_id).zfill(3)
+        with h5py.File(filename, 'a') as f:
+            subgroup_name = os.path.join("input", "model", unitname)
+            if subgroup_name not in f:
+                f.create_group(subgroup_name)
+            inlet = f[subgroup_name]
+
+            s = str(self._unit_type)
+            dtype = 'S{}'.format(len(s) + 1)
+            pointer = np.array(s, dtype=dtype)
+            inlet.create_dataset('UNIT_TYPE',
+                                  data=pointer,
+                                  dtype=dtype)
+
+            s = str(self._inlet_type)
+            dtype = 'S{}'.format(len(s) + 1)
+            pointer = np.array(s, dtype=dtype)
+            inlet.create_dataset('INLET_TYPE',
+                                 data=pointer,
+                                 dtype=dtype)
+
+            # integers
+            value = self.num_components
+            pointer = np.array(value, dtype='i')
+            inlet.create_dataset('NCOMP',
+                                  data=pointer,
+                                  dtype='i')
 
 @UnitOperation.register
 class Column(UnitOperation):
@@ -197,7 +250,7 @@ class Column(UnitOperation):
                 msg = """"{} is not a binding model of 
                 the chromatogrphy model""".format(name)
                 raise RuntimeError(msg)
-        else:
+        elif isinstance(name, BindingModel):
             bm = name.name
             if hasattr(self._model(), bm):
                 self._binding = bm
@@ -205,6 +258,8 @@ class Column(UnitOperation):
                 msg = """"{} is not a binding model of 
                 the chromatogrphy model""".format(bm)
                 raise RuntimeError(msg)
+        else:
+            raise RuntimeError("input not recognized")
 
     def init_c(self, comp_name):
         return self.get_index_parameter(comp_name, 'init_c')

@@ -30,6 +30,23 @@ class Registrar(object):
         single_index_parameters.add(k)
 
     #############################################
+    # Section parameters
+    section_parameters = dict()
+    section_parameters['scalar'] = set()
+    section_parameters['index'] = set()
+
+    section_parameters['scalar'].add('start_time_sec')
+    section_parameters['index'].add('const_coeff')
+    section_parameters['index'].add('lin_coeff')
+    section_parameters['index'].add('quad_coeff')
+    section_parameters['index'].add('cube_coeff')
+
+    section_parameters['scalar def'] = dict()
+    section_parameters['index def'] = dict()
+    for p in section_parameters['index']:
+        section_parameters['index def'][p] = 0.0
+
+    #############################################
     # Column parameters
 
     column_parameters = dict()
@@ -45,7 +62,6 @@ class Registrar(object):
     column_parameters['scalar'].add('binding')
 
     column_parameters['index'].add('init_c')
-    #column_parameters['index'].add('init_cp')
     column_parameters['index'].add('init_q')
     column_parameters['index'].add('film_diffusion')
     column_parameters['index'].add('par_diffusion')
@@ -56,7 +72,6 @@ class Registrar(object):
     column_parameters['index def'] = dict()
     column_parameters['index def']['init_c'] = 0.0
     column_parameters['index def']['init_q'] = 0.0
-    #column_parameters['index def']['init_cp'] = 0.0
     column_parameters['index def']['par_surfdiffusion'] = 0.0
 
     for p in column_parameters['scalar']:

@@ -1,114 +1,81 @@
 from __future__ import print_function
-from pycadet.utils.parse_utils import parse_inputs
-import pandas as pd
+from pycadet.model.data_manager import DataManager
+from pycadet.model.registrar import Registrar
 import numpy as np
-import logging
-import weakref
 import warnings
+import logging
+import h5py
+import os
+
 
 logger = logging.getLogger(__name__)
 
 
-class Section(object):
+class Section(DataManager):
 
-    __slots__ = ('_name',
-                 '_start_time_sec',
-                 '_end_time_sec',
-                 '_coefficients',
-                 '_model')
+    def __init__(self, data=None, **kwargs):
 
-    def __init__(self,
-                 coefficients,
-                 start_time_sec=0,
-                 end_time_sec=-1):
+        super().__init__(data=data, **kwargs)
 
-        # name section
-        self._name = None
+        self._registered_scalar_parameters = \
+            Registrar.section_parameters['scalar']
 
-        # set start time
-        self._start_time_sec = start_time_sec
+        self._registered_index_parameters = \
+            Registrar.section_parameters['sma']['index']
 
-        # set end time
-        self._end_time_sec = end_time_sec
+        # set defaults
+        self._default_scalar_params = \
+            Registrar.section_parameters['scalar def']
 
-        # set coefficients
-        if not isinstance(coefficients, dict):
-            msg = """Section needs a nested dictionary 
-                                comp_name -> coeff_name ->value"""
-            raise RuntimeError(msg)
+        self._default_index_params = \
+            Registrar.section_parameters['index def']
 
-        if len(coefficients):
-            for k, v in coefficients.items():
-                if not isinstance(v, dict):
-                    msg = """Section needs a nested dictionary 
-                    comp_name -> coeff_name ->value"""
-                    raise RuntimeError(msg)
-
-        self._coefficients = coefficients
-
-        # link to Chromatography model
-        self._model = None
-
-    @property
-    def name(self):
-        return self._name
-
-    @name.setter
-    def name(self, name):
-        self._name = name
+        # define unit internal id
+        self._section_id = None
 
     @property
     def start_time_sec(self):
         """
         Return start time in seconds. default 0
         """
-        return self._start_time_sec
+        return self.get_scalar_parameter('start_time_sec')
 
     @start_time_sec.setter
     def start_time_sec(self, value):
-        self._start_time_sec = value
+        self.set_scalar_parameter('start_time_sec', value)
 
-    @property
-    def end_time_sec(self):
-        """
-        Return end time in seconds. default -1
-        """
-        return self._end_time_sec
+    def a0(self, comp_name):
+        return self.get_index_parameter(comp_name, 'const_coeff')
 
-    @end_time_sec.setter
-    def end_time_sec(self, value):
-        """
+    def a1(self, comp_name):
+        return self.get_index_parameter(comp_name, 'lin_coeff')
 
-        :param value: time in seconds
-        :return: None
-        """
-        self._end_time_sec = value
+    def a2(self, comp_name):
+        return self.get_index_parameter(comp_name, 'quad_coeff')
 
-    def add_coefficient(self, comp_name, coeff_name, value):
-        """
+    def a3(self, comp_name):
+        return self.get_index_parameter(comp_name, 'cube_coeff')
 
-        :param comp_name: name of component
-        :param coeff_name: name of coefficient (a0,a1,a2,a3)
-        :param value: value of coefficient
-        :return: None
-        """
-        # TODO: expand to allow multiple adds
-        if comp_name not in self._coefficients.keys():
-            self._coefficients[comp_name] = dict()
-        self._coefficients[comp_name][coeff_name] = value
+    def set_a0(self, comp_name, value):
+        return self.set_index_parameter(comp_name, 'const_coeff', value)
 
-    # TODO create set method for coefficients
+    def set_a1(self, comp_name, value):
+        return self.set_index_parameter(comp_name, 'lin_coeff', value)
 
-    def attach_to_model(self, m, name):
-        """
-        Attach binding model to Chromatography model
-        :param m: Chromatography model to attach binding
-        :param name: name of binding model
-        :return: None
-        """
-        if self._model is not None:
-            warnings.warn("Reseting Chromatography model")
-        setattr(m, name, self)
+    def set_a2(self, comp_name, value):
+        return self.set_index_parameter(comp_name, 'quad_coeff', value)
+
+    def set_a3(self, comp_name, value):
+        return self.set_index_parameter(comp_name, 'cube_coeff', value)
+
+    def f(self, comp_name, c_var):
+
+        df = self.get_index_parameters(with_defaults=True)
+        ordered_coeff = ['const_coeff', 'lin_coeff', 'quad_coeff', 'cube_coeff']
+        accum = 0.0
+        for j, coeff in enumerate(ordered_coeff):
+            accum += df.get_value(comp_name, coeff)*c_var[comp_name]**j
+        return accum
 
     def _check_model(self):
         if self._model is None:
@@ -126,5 +93,43 @@ class Section(object):
         :param kwargs:
         :return:
         """
-        print("TODO")
+
+        self._check_model()
+
+        if not self.is_fully_specified():
+            print(self.get_index_parameters())
+            raise RuntimeError("Missing parameters")
+
+        with h5py.File(filename, 'a') as f:
+            subgroup_name = os.path.join("input", "model", unitname)
+            if subgroup_name not in f:
+                f.create_group(subgroup_name)
+            subgroup = f[subgroup_name]
+            section_name = str(self._section_id).zfill(3)
+            if section_name in subgroup:
+                warnings.warn("Overwriting {}/{}".format(subgroup_name, section_name))
+                section = subgroup[section_name]
+            else:
+                section = subgroup.create_group(section_name)
+
+            # index parameters
+            # doubles
+            list_params = ['const_coeff', 'lin_coeff', 'quad_coeff', 'cube_coeff']
+            list_ids = self.list_components(ids=True)
+            _index_params = self.get_index_parameters(ids=True, with_defaults=True)
+            num_components = self.num_components
+
+            for k in list_params:
+                cadet_name = k.upper()
+                param = _index_params[k]
+                pointer = np.zeros(num_components, dtype='d')
+                for i in list_ids:
+                    ordered_id = self._model()._ordered_ids_for_cadet.index(i)
+                    pointer[ordered_id] = param[i]
+
+                section.create_dataset(cadet_name,
+                                       data=pointer,
+                                       dtype='d')
+
+
 
