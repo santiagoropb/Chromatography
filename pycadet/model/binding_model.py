@@ -28,7 +28,7 @@ class BindingType(Enum):
 
 class BindingModel(abc.ABC):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, data=None, **kwargs):
 
         # define parameters
         self._registered_scalar_parameters = set()
@@ -41,11 +41,10 @@ class BindingModel(abc.ABC):
         self._scalar_params = dict()
         self._index_params = pd.DataFrame()
 
-        # set dictionary with inputs
-        inputs = kwargs.pop('inputs', None)
-        self._inputs = inputs
-        if inputs is not None:
-            self._inputs = self._parse_inputs(inputs)
+        # set data
+        self._inputs = data
+        if data is not None:
+            self._inputs = self._parse_inputs(data)
 
         # link to model
         self._model = None
@@ -70,6 +69,10 @@ class BindingModel(abc.ABC):
     def is_kinetic(self, value):
         self._check_model()
         self._is_kinetic = value
+
+    @property
+    def binding_type(self):
+        return self._binding_type
 
     @property
     def name(self):
@@ -339,9 +342,14 @@ class BindingModel(abc.ABC):
             if k not in self.get_scalar_parameters(True).keys():
                 print("Missing scalar parameter {}".format(k))
                 return False
-            if np.isnan(self._scalar_params[k]):
-                print("Parameter {} is nan".format(k))
-                return False
+
+            if not isinstance(self._scalar_params[k], six.string_types):
+                if np.isnan(self._scalar_params[k]):
+                    print("Parameter {} is nan".format(k))
+                    return False
+            else:
+                if self._scalar_params[k] is None:
+                    return False
 
         return not has_nan
 
@@ -380,10 +388,10 @@ class BindingModel(abc.ABC):
 @BindingModel.register
 class SMABinding(BindingModel):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, data=None, **kwargs):
 
         # call parent binding model constructor
-        super().__init__(*args, **kwargs)
+        super().__init__(data=data, **kwargs)
 
         self._registered_scalar_parameters = \
             Registrar.adsorption_parameters['sma']['scalar']
@@ -468,13 +476,7 @@ class SMABinding(BindingModel):
 
         self._check_model()
 
-        scalar_params = kwargs.pop('scalar_params', None)
-        index_params = kwargs.pop('index_params', None)
-
         assert self._model().salt is not None, "Salt must be defined in chromatography model"
-
-        if scalar_params is not None or index_params is not None:
-            raise NotImplementedError()
 
         if not self.is_fully_specified():
             print(self.get_index_parameters())
@@ -506,8 +508,8 @@ class SMABinding(BindingModel):
                       'sma_nu',
                       'sma_sigma'}
 
-            list_ids = self._model().list_components(ids=True)
-            num_components = self._model().num_components
+            list_ids = self.list_components(ids=True)
+            num_components = self.num_components
             for k in params:
                 cadet_name = k.upper()
                 param = _index_params[k]

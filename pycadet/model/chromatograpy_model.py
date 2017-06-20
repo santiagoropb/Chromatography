@@ -38,9 +38,9 @@ class ChromatographyModel(abc.ABC):
 
         self._salt_id = -1
 
-        self._binding_models = dict()
+        self._binding_models =list()
 
-        self._sections = dict()
+        self._sections = list()
 
         self._units = list()
 
@@ -219,42 +219,43 @@ class ChromatographyModel(abc.ABC):
 
         return self._scalar_params[name]
 
-    def __setattr__(self, name, value):
+    def list_binding_models(self):
+        return [n for n in self._binding_models]
 
+    def binding_models(self):
+        for n in self._binding_models:
+            yield n, getattr(self,n)
+
+    def __setattr__(self, name, value):
         # TODO: add warning if overwriting name?
         if isinstance(value, BindingModel):
             value._model = weakref.ref(self)
             value.name = name
             value._initialize_containers()
-            self._binding_models[name] = weakref.ref(value)
+            self._binding_models.append(name)
 
         if isinstance(value, Section):
             value._model = weakref.ref(self)
             value.name = name
-            self._sections[name] = weakref.ref(value)
+            self._sections.append(name)
 
         if isinstance(value, UnitOperation):
             value._model = weakref.ref(self)
             value._unit_id = len(self._units)
-            found_column = False
-            for u in self._units:
-                if isinstance(u(),Column):
-                    found_column = True
-            if found_column:
-                print("TODO")
-            self._units.append(weakref.ref(value))
+            value._initialize_containers()
+            self._units.append(name)
 
         super(ChromatographyModel, self).__setattr__(name, value)
 
 @ChromatographyModel.register
 class GRModel(ChromatographyModel):
-    def __init__(self, inputs=None):
+    def __init__(self, data=None):
         # call parent binding model constructor
         super().__init__()
 
         # parse inputs
-        if inputs is not None:
-            args = self._parse_inputs(inputs)
+        if data is not None:
+            args = self._parse_inputs(data)
             self._parse_scalar_params(args)
             self._parse_components(args)
 

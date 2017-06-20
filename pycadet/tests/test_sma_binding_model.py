@@ -1,6 +1,5 @@
 from pycadet.model.binding_model import SMABinding
 from pycadet.model.chromatograpy_model import GRModel
-import pycadet.utils.parse_utils as pu
 from pycadet.utils.compare import equal_dictionaries
 from collections import OrderedDict
 import unittest
@@ -13,15 +12,19 @@ import os
 
 class TestBindingModel(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+
+        cls.base_model_data = dict()
+        cls.base_model_data['components'] = ['salt',
+                                              'lysozyme',
+                                              'cytochrome',
+                                              'ribonuclease']
+
+        cls.base_model_data['scalar parameters'] = dict()
+        cls.m = GRModel(data=cls.base_model_data)
+
     def setUp(self):
-
-        self.base_model_data = dict()
-        self.base_model_data['components'] = ['salt',
-                                        'lysozyme',
-                                        'cytochrome',
-                                        'ribonuclease']
-
-        self.base_model_data['scalar parameters'] = dict()
 
         self.test_data = dict()
         self.test_data['index parameters'] = OrderedDict()
@@ -70,9 +73,6 @@ class TestBindingModel(unittest.TestCase):
         comps[cid]['sma_nu'] = 3.7
         comps[cid]['sma_sigma'] = 10.0
 
-
-        self.m = GRModel(self.base_model_data)
-
     def test_is_kinetic(self):
         GRM = self.m
         GRM.binding = SMABinding()
@@ -83,13 +83,13 @@ class TestBindingModel(unittest.TestCase):
     def test_is_fully_specified(self):
 
         GRM = GRModel(self.base_model_data)
-        GRM.binding = SMABinding(inputs=self.test_data)
+        GRM.binding = SMABinding(data=self.test_data)
         self.assertTrue(GRM.binding.is_fully_specified())
 
     def test_parsing_from_dict(self):
 
         GRM = self.m
-        GRM.binding = SMABinding(inputs=self.test_data)
+        GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         parsed = bm._parse_inputs(self.test_data)
         unparsed = self.test_data
@@ -104,7 +104,7 @@ class TestBindingModel(unittest.TestCase):
             yaml.dump(self.test_data, outfile, default_flow_style=False)
 
         GRM = self.m
-        GRM.binding = SMABinding(inputs=self.test_data)
+        GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         parsed = bm._parse_inputs(filename)
         unparsed = self.test_data
@@ -114,7 +114,7 @@ class TestBindingModel(unittest.TestCase):
 
     def test_parsing_scalar_params(self):
         GRM = self.m
-        GRM.binding = SMABinding(inputs=self.test_data)
+        GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         self.assertEqual(bm.num_scalar_parameters, 1)
         parsed = bm.get_scalar_parameters()
@@ -123,7 +123,7 @@ class TestBindingModel(unittest.TestCase):
 
     def test_parsing_components(self):
         GRM = self.m
-        GRM.binding = SMABinding(inputs=self.test_data)
+        GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         parsed = bm.get_index_parameters(with_defaults=False,
                                         form='dictionary')
@@ -133,7 +133,7 @@ class TestBindingModel(unittest.TestCase):
     def test_set_index_param(self):
 
         GRM = self.m
-        GRM.binding = SMABinding(inputs=self.test_data)
+        GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         bm.set_index_parameter('lysozyme', 'sma_kads', 777)
         parsed = bm.get_index_parameters(with_defaults=False,
@@ -144,13 +144,13 @@ class TestBindingModel(unittest.TestCase):
 
     def test_num_components(self):
         GRM = self.m
-        GRM.binding = SMABinding(inputs=self.test_data)
+        GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         self.assertEqual(4, bm.num_components)
 
     def test_num_index_params(self):
         GRM = self.m
-        GRM.binding = SMABinding(inputs=self.test_data)
+        GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         self.assertEqual(4, bm.num_index_parameters)
 
@@ -218,7 +218,7 @@ class TestSMABindingModel(unittest.TestCase):
 
     def test_kads(self):
         GRM = GRModel(self.base_model_data)
-        GRM.binding = SMABinding(inputs=self.test_data)
+        GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         cname = 'ribonuclease'
         val = self.test_data['index parameters'][cname]['sma_kads']
@@ -226,7 +226,7 @@ class TestSMABindingModel(unittest.TestCase):
 
     def test_kdes(self):
         GRM = GRModel(self.base_model_data)
-        GRM.binding = SMABinding(inputs=self.test_data)
+        GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         cname = 'salt'
         val = self.test_data['index parameters'][cname]['sma_kdes']
@@ -234,7 +234,7 @@ class TestSMABindingModel(unittest.TestCase):
 
     def test_nu(self):
         GRM = GRModel(self.base_model_data)
-        GRM.binding = SMABinding(inputs=self.test_data)
+        GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         cname = 'salt'
         val = self.test_data['index parameters'][cname]['sma_nu']
@@ -242,7 +242,7 @@ class TestSMABindingModel(unittest.TestCase):
 
     def test_sigma(self):
         GRM = GRModel(self.base_model_data)
-        GRM.binding = SMABinding(inputs=self.test_data)
+        GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         cname = 'lysozyme'
         val = self.test_data['index parameters'][cname]['sma_sigma']
@@ -250,7 +250,7 @@ class TestSMABindingModel(unittest.TestCase):
 
     def test_f_ads(self):
         GRM = self.m
-        GRM.binding = SMABinding(inputs=self.test_data)
+        GRM.binding = SMABinding(data=self.test_data)
         m = GRM.binding
 
         GRM.salt = 'salt'
@@ -303,7 +303,7 @@ class TestSMABindingModel(unittest.TestCase):
     def test_write_to_cadet(self):
         GRM = self.m
         GRM.salt = 'salt'
-        GRM.binding = SMABinding(inputs=self.test_data)
+        GRM.binding = SMABinding(data=self.test_data)
         m = GRM.binding
 
         test_dir = tempfile.mkdtemp()
@@ -312,6 +312,7 @@ class TestSMABindingModel(unittest.TestCase):
         unit = 'unit_001'
         m.write_to_cadet_input_file(filename, unit)
 
+        path = os.path.join("input", "model", unit, "adsorption")
         # read back and verify output
         with h5py.File(filename, 'r') as f:
             params = {'sma_kads',
@@ -321,15 +322,18 @@ class TestSMABindingModel(unittest.TestCase):
             # assumes salt is component 0
             for p in params:
                 name = p.upper()
-                path = 'input/model/unit_001/adsorption/{}'.format(name)
-                for i, e in enumerate(f[path]):
+                dataset = os.path.join(path, name)
+                read = f[dataset]
+                for i, e in enumerate(read):
                     comp_id = GRM._ordered_ids_for_cadet[i]
                     comp_name = GRM._comp_id_to_name[comp_id]
                     value = self.test_data['index parameters'][comp_name][p]
                     self.assertEqual(value, e)
 
-            is_k = f['input/model/unit_001/adsorption/IS_KINETIC'].value
-            self.assertEqual(is_k, m.is_kinetic)
+            name = 'IS_KINETIC'
+            dataset = os.path.join(path, name)
+            read = f[dataset].value
+            self.assertEqual(read, m.is_kinetic)
 
         shutil.rmtree(test_dir)
 

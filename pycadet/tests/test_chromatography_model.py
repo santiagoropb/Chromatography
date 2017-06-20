@@ -46,14 +46,14 @@ class TestChromatographyModel(unittest.TestCase):
         shutil.rmtree(test_dir)
 
     def test_parsing_scalar_params(self):
-        m = GRModel(self.test_data)
+        m = GRModel(data=self.test_data)
         self.assertEqual(m.num_scalar_parameters, 1)
         parsed = m.get_scalar_parameters()
         unparsed = self.test_data['scalar parameters']
         self.assertTrue(equal_dictionaries(parsed, unparsed))
 
     def test_parsing_components(self):
-        m = GRModel(self.test_data)
+        m = GRModel(data=self.test_data)
         inner = m.list_components()
         outer = set(self.test_data['components'])
         self.assertEqual(m.num_components, len(outer))
@@ -62,24 +62,24 @@ class TestChromatographyModel(unittest.TestCase):
 
     @unittest.skip("ignored for now")
     def test_del_component(self):
-        m = GRModel(self.test_data)
+        m = GRModel(data=self.test_data)
         m.del_component('lysozyme')
         self.assertEqual(m.num_components, 3)
         self.assertFalse('lisozome' in m.list_components())
 
     def test_add_component(self):
-        m = GRModel(self.test_data)
+        m = GRModel(data=self.test_data)
         m.add_component('chlorine')
         self.assertEqual(m.num_components, 5)
         self.assertTrue('chlorine' in m.list_components())
         self.assertTrue('chlorine' in m._comp_name_to_id.keys())
 
     def test_num_components(self):
-        m = GRModel(self.test_data)
+        m = GRModel(data=self.test_data)
         self.assertEqual(4, m.num_components)
 
     def test_is_salt(self):
-        m = GRModel(self.test_data)
+        m = GRModel(data=self.test_data)
         m.salt = 'salt'
         self.assertTrue(m.is_salt('salt'))
         self.assertFalse(m.is_salt('blah'))
