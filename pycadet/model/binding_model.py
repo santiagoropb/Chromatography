@@ -30,6 +30,7 @@ class BindingModel(abc.ABC):
 
     def __init__(self, *args, **kwargs):
 
+        # define parameters
         self._registered_scalar_parameters = set()
         self._registered_index_parameters = set()
 
@@ -223,7 +224,7 @@ class BindingModel(abc.ABC):
         :return: value
         """
         cid = self._model().get_component_id(comp_name)
-        return self._index_params.get(cid, name)
+        return self._index_params.get_value(cid, name)
 
     def set_scalar_parameter(self, name, value):
         self._check_model()
@@ -338,6 +339,9 @@ class BindingModel(abc.ABC):
             if k not in self.get_scalar_parameters(True).keys():
                 print("Missing scalar parameter {}".format(k))
                 return False
+            if np.isnan(self._scalar_params[k]):
+                print("Parameter {} is nan".format(k))
+                return False
 
         return not has_nan
 
@@ -345,7 +349,7 @@ class BindingModel(abc.ABC):
 
         # initialize containers
         for k in self._registered_scalar_parameters:
-            if k not in self._scalar_params.keys():
+            if self._scalar_params.get(k) is None:
                 self._scalar_params[k] = np.nan
 
         if self._inputs is None:
@@ -354,14 +358,21 @@ class BindingModel(abc.ABC):
                                               columns=self._registered_index_parameters)
 
         for k, v in self._default_scalar_params.items():
-            if not np.isnan(self._scalar_params[k]):
+            if np.isnan(self._scalar_params[k]):
                 self._scalar_params[k] = v
 
     def _initialize_containers(self):
+
         self._parse_scalar_parameters()
         self._parse_index_parameters()
         self._fill_containers()
         self._inputs = None
+
+    def list_components(self, ids=False):
+        if ids:
+            return [k for k in self._components]
+        else:
+            return [self._model()._comp_id_to_name[k] for k in self._components]
 
     def help(self):
         print("TODO")
@@ -495,7 +506,6 @@ class SMABinding(BindingModel):
                       'sma_nu',
                       'sma_sigma'}
 
-            salt_id = self._model()._salt_id
             list_ids = self._model().list_components(ids=True)
             num_components = self._model().num_components
             for k in params:
@@ -520,6 +530,25 @@ class SMABinding(BindingModel):
             # TODO: this can be moved to based class if some additional
             # TODO: sets are added
 
+    def kads(self, comp_name):
+        return self.get_index_parameter(comp_name, 'sma_kads')
+
+    def kdes(self, comp_name):
+        return self.get_index_parameter(comp_name, 'sma_kdes')
+
+    def nu(self, comp_name):
+        return self.get_index_parameter(comp_name, 'sma_nu')
+
+    def sigma(self, comp_name):
+        return self.get_index_parameter(comp_name, 'sma_sigma')
+
+    @property
+    def lamda(self):
+        return self.get_scalar_parameter('sma_lambda')
+
+    @lamda.setter
+    def lamda(self, value):
+        self.set_scalar_parameter('sma_lambda', value)
 
 
 

@@ -31,7 +31,7 @@ class Registrar(object):
 
     #############################################
     # Column parameters
-    """
+
     column_parameters = dict()
     column_parameters['scalar'] = set()
     column_parameters['index'] = set()
@@ -68,7 +68,7 @@ class Registrar(object):
     for p, v in column_parameters['index def'].items():
         default_single_index_parameters[p] = v
         
-    """
+
     #############################################
     # ADSORPTION parameters
     # TODO: in the future move adsorption parameters
