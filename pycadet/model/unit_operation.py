@@ -82,14 +82,46 @@ class UnitOperation(DataManager, abc.ABC):
         :param section: Chromatography model defined section
         :return: None
         """
+
         if isinstance(name, six.string_types):
             if hasattr(self._model(), name):
+                sec = getattr(self._model(), name)
+                sec_components = sec.list_components(ids=True)
+                if sec.num_components != self.num_components:
+                    msg = """ The section does not
+                    have the same number of components
+                    as the {}
+                    """.format(self.__class__.__name__)
+                    raise RuntimeError(msg)
+                for i in sec_components:
+                    if i not in self.list_components(ids=True):
+                        msg = """ Component {} in section is not a 
+                        component of
+                        {} """.format(self._model()._comp_id_to_name[i],
+                                      self.__class__.__name__)
+                        raise RuntimeError(msg)
                 self._sections.append(name)
             else:
                 msg = """"{} is not a section of 
                         the chromatogrphy model""".format(name)
                 raise RuntimeError(msg)
         elif isinstance(name, Section):
+            sec = name
+            sec_components = sec.list_components(ids=True)
+            if sec.num_components != self.num_components:
+                msg = """ The section does not
+                                have the same number of components
+                                as the {}
+                                """.format(self.__class__.__name__)
+                raise RuntimeError(msg)
+            for i in sec_components:
+                if i not in self.list_components(ids=True):
+                    msg = """ Component {} in section is not a 
+                                    component of
+                                    {} """.format(self._model()._comp_id_to_name[i],
+                                                  self.__class__.__name__)
+                    raise RuntimeError(msg)
+
             section = name.name
             if hasattr(self._model(), section):
                 self._sections.append(section)

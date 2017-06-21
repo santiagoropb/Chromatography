@@ -14,7 +14,7 @@ URL = 'TODO'
 
 setuptools_kwargs = {
     'zip_safe': False,
-    'install_requires': ['pint', 'six','pyomo','pyyaml'],
+    'install_requires': ['pint', 'six','pyomo','pyyaml','h5py'],
     'scripts': [],
     'include_package_data': True
 }
