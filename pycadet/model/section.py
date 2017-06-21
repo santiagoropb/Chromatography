@@ -21,7 +21,7 @@ class Section(DataManager):
             Registrar.section_parameters['scalar']
 
         self._registered_index_parameters = \
-            Registrar.section_parameters['sma']['index']
+            Registrar.section_parameters['index']
 
         # set defaults
         self._default_scalar_params = \
@@ -39,6 +39,17 @@ class Section(DataManager):
         Return start time in seconds. default 0
         """
         return self.get_scalar_parameter('start_time_sec')
+
+    @property
+    def num_index_parameters(self):
+        """
+        Returns number of indexed parameters (ignore default columns)
+        """
+
+        df = self._index_params
+        df.dropna(axis=1, how='all', inplace=True)
+
+        return len(df.columns)
 
     @start_time_sec.setter
     def start_time_sec(self, value):
@@ -84,6 +95,9 @@ class Section(DataManager):
                      model e.g \\n m = GRModel() \\n m.section1 = Section(coeff). Alternatively,
                      call section.attach_to_model(m, name) to fix the problem"""
             raise RuntimeError(msg)
+
+    def get_index_parameters(self, with_defaults=True, ids=False, form='dataframe'):
+        return super().get_index_parameters(with_defaults=with_defaults, ids=ids, form=form)
 
     def write_to_cadet_input_file(self, filename, unitname, **kwargs):
         """

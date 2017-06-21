@@ -238,6 +238,7 @@ class ChromatographyModel(abc.ABC):
             value._model = weakref.ref(self)
             value._section_id = len(self._sections)
             value.name = name
+            value._initialize_containers()
             self._sections.append(name)
 
         if isinstance(value, UnitOperation):

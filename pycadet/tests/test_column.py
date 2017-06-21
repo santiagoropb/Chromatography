@@ -23,7 +23,7 @@ class TestColumn(unittest.TestCase):
                                              'ribonuclease']
 
         cls.base_model_data['scalar parameters'] = dict()
-        cls.m = GRModel(cls.base_model_data)
+        cls.m = GRModel(data=cls.base_model_data)
 
         cls.sma_data = dict()
         cls.sma_data['index parameters'] = OrderedDict()
