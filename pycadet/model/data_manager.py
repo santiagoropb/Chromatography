@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class DataManager(object):
 
-    def __init__(self, data=None, **kwargs):
+    def __init__(self, components=None, data=None, **kwargs):
 
         # define parameters
         self._registered_scalar_parameters = set()
@@ -25,6 +25,9 @@ class DataManager(object):
 
         self._scalar_params = dict()
         self._index_params = pd.DataFrame()
+
+        # keep track of components passed
+        self._passed_components = components
 
         # set data
         self._inputs = data
@@ -42,7 +45,7 @@ class DataManager(object):
         # set name
         self._name = None
 
-        super().__init__()
+        #super().__init__()
 
     @property
     def name(self):
@@ -111,24 +114,39 @@ class DataManager(object):
             registered_inputs = self._registered_index_parameters
             default_inputs = self._default_index_params
             dict_inputs = self._inputs.get('index parameters')
-            self._index_params = parse_utils.parse_parameters_indexed_by_components(dict_inputs,
-                                                                                    map_id,
-                                                                                    registered_inputs,
-                                                                                    default_inputs)
+
+            self._index_params = \
+                parse_utils.parse_parameters_indexed_by_components(dict_inputs,
+                                                                   map_id,
+                                                                   registered_inputs,
+                                                                   default_inputs)
+            if self._passed_components is not None:
+                sub_list = list()
+                for name in self._passed_components:
+                    if self._model().is_model_component(name):
+                        cid = self._model().get_component_id(name)
+                        sub_list.append(cid)
+                    else:
+                        msg = """ {} is not a component of the
+                        chromatography model. Ignored""".format(name)
+                        raise warnings.warn(msg)
+                for cid in sub_list:
+                    if cid not in self._index_params.index:
+                        self.add_component(self._model()._comp_id_to_name[cid])
 
             for cid in self._index_params.index:
                 self._components.add(cid)
 
         else:
-            msg = """ No inputs when _parse_index_parameters
-                        was called in {}""".format(self.__class__.__name__)
-            logger.debug(msg)
+            if self._passed_components is not None:
+                for name in self._passed_components:
+                    self.add_component(name)
 
     def add_component(self, name, parameters=None):
 
         if not self._model().is_model_component(name):
             msg = """{} is not a component of the 
-            chromatography model"""
+            chromatography model""".format(name)
             raise RuntimeError(msg)
 
         cid = self._model().get_component_id(name)
@@ -136,6 +154,7 @@ class DataManager(object):
             self._index_params = pd_utils.add_row_to_df(self._index_params,
                                                         cid,
                                                         parameters=parameters)
+            self._components.add(cid)
 
     def get_scalar_parameter(self, name):
         self._check_model()
@@ -288,14 +307,18 @@ class DataManager(object):
             if self._scalar_params.get(k) is None:
                 self._scalar_params[k] = np.nan
 
-        if self._inputs is None:
-            self._index_params = pd.DataFrame(np.nan,
-                                              index=[],
-                                              columns=self._registered_index_parameters)
-
         for k, v in self._default_scalar_params.items():
             if np.isnan(self._scalar_params[k]):
                 self._scalar_params[k] = v
+
+        for k, v in self._default_index_params.items():
+            for cid in self._index_params.index:
+                if np.isnan(self._index_params.get_value(cid, k)):
+                    self._index_params.set_value(cid, k, v)
+
+        if self._index_params.empty:
+            self._index_params = pd.DataFrame(index=[],
+                                              columns=self._registered_index_parameters)
 
     def _initialize_containers(self):
 

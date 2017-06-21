@@ -42,7 +42,7 @@ class UnitOperation(DataManager, abc.ABC):
         # define unit internal id
         self._unit_id = None
 
-        self._sections = []
+        self._sections = set()
         # append sections
         if sections is not None:
             for s in sections:
@@ -100,7 +100,7 @@ class UnitOperation(DataManager, abc.ABC):
                         {} """.format(self._model()._comp_id_to_name[i],
                                       self.__class__.__name__)
                         raise RuntimeError(msg)
-                self._sections.append(name)
+                self._sections.add(name)
             else:
                 msg = """"{} is not a section of 
                         the chromatogrphy model""".format(name)
@@ -124,13 +124,20 @@ class UnitOperation(DataManager, abc.ABC):
 
             section = name.name
             if hasattr(self._model(), section):
-                self._sections.append(section)
+                self._sections.add(section)
             else:
                 msg = """"{} is not a section of 
                             the chromatogrphy model""".format(section)
                 raise RuntimeError(msg)
         else:
             raise RuntimeError("input not recognized")
+
+    def _write_sections_to_cadet_input_file(self, filename):
+
+        unitname = str(self._unit_id).zfill(3)
+        for name in self._sections:
+            sec = getattr(self._model(), name)
+            sec.write_to_cadet_input_file(filename,unitname)
 
 
 @UnitOperation.register
@@ -186,6 +193,9 @@ class Inlet(UnitOperation):
                                   data=pointer,
                                   dtype='i')
 
+        self._write_sections_to_cadet_input_file(filename)
+
+
 @UnitOperation.register
 class Column(UnitOperation):
 
@@ -205,6 +215,10 @@ class Column(UnitOperation):
 
         self._default_index_params = \
             Registrar.column_parameters['index def']
+
+        # reset index params container
+        self._index_params = pd.DataFrame(index=[],
+                                          columns=self._registered_index_parameters)
 
         # Define type of unit operation
         self._unit_type = UnitOperationType.INLET
@@ -277,6 +291,22 @@ class Column(UnitOperation):
     def binding_model(self, name):
         if isinstance(name, six.string_types):
             if hasattr(self._model(), name):
+
+                bm = getattr(self._model(), name)
+                bm_components = bm.list_components(ids=True)
+                if bm.num_components != self.num_components:
+                    msg = """ The binding model does not
+                    have the same number of components
+                    as the {}
+                    """.format(self.__class__.__name__)
+                    raise RuntimeError(msg)
+                for i in bm_components:
+                    if i not in self.list_components(ids=True):
+                        msg = """ Component {} in binding model is not a 
+                        component of
+                        {} """.format(self._model()._comp_id_to_name[i],
+                        self.__class__.__name__)
+                        raise RuntimeError(msg)
                 self._binding = name
             else:
                 msg = """"{} is not a binding model of 
@@ -284,6 +314,22 @@ class Column(UnitOperation):
                 raise RuntimeError(msg)
         elif isinstance(name, BindingModel):
             bm = name.name
+            bm_ = name
+            bm_components = bm_.list_components(ids=True)
+            if bm.num_components != self.num_components:
+                msg = """ The binding model does not
+                                have the same number of components
+                                as the {}
+                                """.format(self.__class__.__name__)
+                raise RuntimeError(msg)
+            for i in bm_components:
+                if i not in self.list_components(ids=True):
+                    msg = """ Component {} in binding model is not a 
+                    component of
+                    {} """.format(self._model()._comp_id_to_name[i],
+                    self.__class__.__name__)
+                    raise RuntimeError(msg)
+
             if hasattr(self._model(), bm):
                 self._binding = bm
             else:
@@ -344,14 +390,14 @@ class Column(UnitOperation):
                 if self._scalar_params.get(k) is None:
                     self._scalar_params[k] = np.nan
 
-        if self._inputs is None:
-            self._index_params = pd.DataFrame(np.nan,
-                                              index=[],
-                                              columns=self._registered_index_parameters)
-
         for k, v in self._default_scalar_params.items():
             if np.isnan(self._scalar_params[k]):
                 self._scalar_params[k] = v
+
+        for k, v in self._default_index_params.items():
+            for cid in self._index_params.index:
+                if np.isnan(self._index_params.get_value(cid, k)):
+                    self._index_params.set_value(cid, k, v)
 
     def _initialize_containers(self):
 
@@ -454,7 +500,11 @@ class Column(UnitOperation):
                                       data=pointer,
                                       dtype='d')
 
+        # writes binding model
         self.binding_model.write_to_cadet_input_file(filename, unitname)
+
+        # writes sections
+        self._write_sections_to_cadet_input_file(filename)
 
 
 @UnitOperation.register

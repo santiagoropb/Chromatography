@@ -24,6 +24,7 @@ class TestBindingModel(unittest.TestCase):
         cls.base_model_data['scalar parameters'] = dict()
         cls.m = GRModel(data=cls.base_model_data)
 
+
     def setUp(self):
 
         self.test_data = dict()
@@ -82,7 +83,7 @@ class TestBindingModel(unittest.TestCase):
 
     def test_is_fully_specified(self):
 
-        GRM = GRModel(self.base_model_data)
+        GRM = GRModel(data=self.base_model_data)
         GRM.binding = SMABinding(data=self.test_data)
         self.assertTrue(GRM.binding.is_fully_specified())
 
@@ -214,10 +215,10 @@ class TestSMABindingModel(unittest.TestCase):
         comps[cid]['sma_nu'] = 3.7
         comps[cid]['sma_sigma'] = 10.0
 
-        self.m = GRModel(self.base_model_data)
+        self.m = GRModel(data=self.base_model_data)
 
     def test_kads(self):
-        GRM = GRModel(self.base_model_data)
+        GRM = GRModel(data=self.base_model_data)
         GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         cname = 'ribonuclease'
@@ -225,7 +226,7 @@ class TestSMABindingModel(unittest.TestCase):
         self.assertEqual(bm.kads(cname), val)
 
     def test_kdes(self):
-        GRM = GRModel(self.base_model_data)
+        GRM = GRModel(data=self.base_model_data)
         GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         cname = 'salt'
@@ -233,7 +234,7 @@ class TestSMABindingModel(unittest.TestCase):
         self.assertEqual(bm.kdes(cname), val)
 
     def test_nu(self):
-        GRM = GRModel(self.base_model_data)
+        GRM = GRModel(data=self.base_model_data)
         GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         cname = 'salt'
@@ -241,7 +242,7 @@ class TestSMABindingModel(unittest.TestCase):
         self.assertEqual(bm.nu(cname), val)
 
     def test_sigma(self):
-        GRM = GRModel(self.base_model_data)
+        GRM = GRModel(data=self.base_model_data)
         GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         cname = 'lysozyme'
@@ -249,9 +250,12 @@ class TestSMABindingModel(unittest.TestCase):
         self.assertEqual(bm.sigma(cname), val)
 
     def test_f_ads(self):
+
         GRM = self.m
+        print(self.m.list_components())
         GRM.binding = SMABinding(data=self.test_data)
         m = GRM.binding
+
 
         GRM.salt = 'salt'
 

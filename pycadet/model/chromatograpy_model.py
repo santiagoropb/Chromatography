@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class ChromatographyModel(abc.ABC):
 
-    def __init__(self):
+    def __init__(self, components=None):
 
         # define registered params
         self._registered_scalar_parameters = Registrar.scalar_parameters
@@ -45,6 +45,11 @@ class ChromatographyModel(abc.ABC):
         self._units = list()
 
         self._ordered_ids_for_cadet = list()
+
+        # add passed components
+        if components is not None:
+            for cname in components:
+                self.add_component(cname)
 
     @property
     def salt(self):
@@ -124,11 +129,12 @@ class ChromatographyModel(abc.ABC):
             self._scalar_params[k] = val
 
     def add_component(self, name):
-        new_id = len(self._components)
-        self._comp_name_to_id[name] = new_id
-        self._comp_id_to_name[new_id] = name
-        self._components.add(new_id)
-        self._ordered_ids_for_cadet.append(new_id)
+        if name not in self._comp_name_to_id.keys():
+            new_id = len(self._components)
+            self._comp_name_to_id[name] = new_id
+            self._comp_id_to_name[new_id] = name
+            self._components.add(new_id)
+            self._ordered_ids_for_cadet.append(new_id)
 
     def _parse_components(self, args):
         """
@@ -136,7 +142,7 @@ class ChromatographyModel(abc.ABC):
         :param args: dictionary with parsed inputs
         :return: None
         """
-        list_comp = args.get('components')
+        list_comp = args.get('components', [])
         for cname in list_comp:
             self.add_component(cname)
 
@@ -251,9 +257,10 @@ class ChromatographyModel(abc.ABC):
 
 @ChromatographyModel.register
 class GRModel(ChromatographyModel):
-    def __init__(self, data=None):
+    def __init__(self, components=None, data=None):
+
         # call parent binding model constructor
-        super().__init__()
+        super().__init__(components=components)
 
         # parse inputs
         if data is not None:

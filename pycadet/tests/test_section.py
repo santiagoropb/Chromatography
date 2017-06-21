@@ -1,6 +1,5 @@
-from pycadet.model.unit_operation import Column
 from pycadet.model.chromatograpy_model import GRModel
-from pycadet.model.section import  Section
+from pycadet.model.section import Section
 from pycadet.utils.compare import equal_dictionaries, pprint_dict
 from collections import OrderedDict
 import numpy as np

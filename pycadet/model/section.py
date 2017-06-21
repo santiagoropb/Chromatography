@@ -1,6 +1,7 @@
 from __future__ import print_function
 from pycadet.model.data_manager import DataManager
 from pycadet.model.registrar import Registrar
+import pandas as pd
 import numpy as np
 import warnings
 import logging
@@ -13,9 +14,11 @@ logger = logging.getLogger(__name__)
 
 class Section(DataManager):
 
-    def __init__(self, data=None, **kwargs):
+    def __init__(self, components=None, data=None, **kwargs):
 
-        super().__init__(data=data, **kwargs)
+        super().__init__(components=components,
+                         data=data,
+                         **kwargs)
 
         self._registered_scalar_parameters = \
             Registrar.section_parameters['scalar']
@@ -30,8 +33,12 @@ class Section(DataManager):
         self._default_index_params = \
             Registrar.section_parameters['index def']
 
+        # reset index params container
+        self._index_params = pd.DataFrame(index=[],
+                                          columns=self._registered_index_parameters)
         # define unit internal id
         self._section_id = None
+
 
     @property
     def start_time_sec(self):

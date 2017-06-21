@@ -2,6 +2,7 @@ from __future__ import print_function
 from pycadet.model.registrar import Registrar
 from pycadet.model.data_manager import DataManager
 from enum import Enum
+import pandas as pd
 import numpy as np
 import warnings
 import logging
@@ -109,6 +110,10 @@ class SMABinding(BindingModel):
 
         self._default_index_params = \
             Registrar.adsorption_parameters['sma']['index def']
+
+        # reset index params container
+        self._index_params = pd.DataFrame(index=[],
+                                          columns=self._registered_index_parameters)
 
         self._binding_type = BindingType.STERIC_MASS_ACTION
 
