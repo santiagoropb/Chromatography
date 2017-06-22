@@ -126,7 +126,7 @@ class Section(DataManager):
             if subgroup_name not in f:
                 f.create_group(subgroup_name)
             subgroup = f[subgroup_name]
-            section_name = str(self._section_id).zfill(3)
+            section_name = 'sec_'+str(self._section_id).zfill(3)
             if section_name in subgroup:
                 warnings.warn("Overwriting {}/{}".format(subgroup_name, section_name))
                 section = subgroup[section_name]

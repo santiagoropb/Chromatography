@@ -235,7 +235,7 @@ class TestSection(unittest.TestCase):
         unitname = 'unit_000'
         sec.write_to_cadet_input_file(filename, unitname)
 
-        section_name = str(sec._section_id).zfill(3)
+        section_name = 'sec_'+str(sec._section_id).zfill(3)
         # read back and verify output
         with h5py.File(filename, 'r') as f:
             path = os.path.join("input", "model", unitname, section_name)

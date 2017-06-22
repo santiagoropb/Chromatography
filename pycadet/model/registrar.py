@@ -29,6 +29,24 @@ class Registrar(object):
     for k in default_single_index_parameters.keys():
         single_index_parameters.add(k)
 
+    # cadet solver parameters
+    solver_parameters = set()
+    solver_parameters.add('abstol')
+    solver_parameters.add('algtol')
+    solver_parameters.add('init_step_size')
+    solver_parameters.add('max_steps')
+    solver_parameters.add('reltol')
+    solver_parameters.add('nthreads')
+
+    solver_defaults = dict()
+    solver_defaults['abstol'] = 1e-8
+    solver_defaults['algtol'] = 1e-12
+    solver_defaults['init_step_size'] = 1e-6
+    solver_defaults['max_steps'] = 1e5
+    solver_defaults['reltol'] = 1e-6
+    solver_defaults['nthreads'] = 1
+
+
     #############################################
     # Section parameters
     section_parameters = dict()
@@ -85,6 +103,31 @@ class Registrar(object):
 
     for p, v in column_parameters['index def'].items():
         default_single_index_parameters[p] = v
+
+    ###############################################
+    # discretization
+    discretization_parameters = set()
+    discretization_parameters.add('ncol')
+    discretization_parameters.add('npar')
+    discretization_parameters.add('nbound')
+    discretization_parameters.add('par_disc_type')
+    discretization_parameters.add('use_analytic_jacobian')
+    #discretization_parameters.add('reconstruction')
+    discretization_parameters.add('gs_type')
+    discretization_parameters.add('max_krylov')
+    discretization_parameters.add('max_restarts')
+    discretization_parameters.add('schur_safety')
+
+    discretization_defaults = dict()
+    discretization_defaults['gs_type'] = 1
+    discretization_defaults['max_krylov'] = 0
+    discretization_defaults['max_restart'] = 10
+    discretization_defaults['schur_safety'] = 1e-8
+    discretization_defaults['use_analytic_jacobian'] = 1
+    discretization_defaults['par_disc_type'] = 'EQUIDISTANT_PAR'
+    #discretization_defaults['reconstruction'] = 'WENO'
+
+
         
 
     #############################################

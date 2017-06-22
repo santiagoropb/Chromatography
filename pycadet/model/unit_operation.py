@@ -61,6 +61,10 @@ class UnitOperation(DataManager, abc.ABC):
         """
         return len(self.get_scalar_parameters(with_defaults=False))
 
+    @property
+    def unit_id(self):
+        return self._unit_id
+
     def _check_model(self):
         if self._model is None:
             msg = """UnitOperation not attached to a Chromatography model.
@@ -132,6 +136,13 @@ class UnitOperation(DataManager, abc.ABC):
         else:
             raise RuntimeError("input not recognized")
 
+    def get_section(self, name):
+        if name in self._sections:
+            return getattr(self._model(), name)
+
+    def list_sections(self):
+        return list(self._sections)
+
     def _write_sections_to_cadet_input_file(self, filename):
 
         unitname = str(self._unit_id).zfill(3)
@@ -165,7 +176,7 @@ class Inlet(UnitOperation):
             print(self.get_index_parameters())
             raise RuntimeError("Missing parameters")
 
-        unitname = str(self._unit_id).zfill(3)
+        unitname = 'unit_'+str(self._unit_id).zfill(3)
         with h5py.File(filename, 'a') as f:
             subgroup_name = os.path.join("input", "model", unitname)
             if subgroup_name not in f:
@@ -228,6 +239,9 @@ class Column(UnitOperation):
 
         # binding model
         self._binding = None
+
+        # discretized flag
+        self._discretized = False
 
 
     @property
@@ -428,7 +442,7 @@ class Column(UnitOperation):
             print(self.get_index_parameters())
             raise RuntimeError("Missing parameters")
 
-        unitname = str(self._unit_id).zfill(3)
+        unitname = 'unit_'+str(self._unit_id).zfill(3)
         with h5py.File(filename, 'a') as f:
 
             subgroup_name = os.path.join("input", "model", unitname)
@@ -506,6 +520,177 @@ class Column(UnitOperation):
         # writes sections
         self._write_sections_to_cadet_input_file(filename)
 
+    def write_discretization_to_cadet_input_file(self, filename, ncol, npar,**kwargs):
+
+        self._check_model()
+
+        double_parameters = dict()
+        reg_disc = Registrar.discretization_defaults
+        double_parameters['schur-safety'] = kwargs.pop('schur-safety', reg_disc['schur-safety'])
+
+        int_params = ['par_disc_type',
+                      'use_analytic_jacobian',
+                      'gs_type',
+                      'max_krylov',
+                      'max_restarts']
+
+        par_disc_type = kwargs.pop('par_disc_type', 'EQUIDISTANT_PAR')
+
+        integer_parameters = dict()
+        for n in int_params:
+            integer_parameters[n] = kwargs.pop(n, reg_disc[n])
+
+        integer_parameters['ncol'] = ncol
+        integer_parameters['npar'] = npar
+
+        weno_parameters = dict()
+        weno_parameters['boundary_model'] = kwargs.pop('boundary_model',0)
+        weno_parameters['weno_order'] = kwargs.pop('weno_order', 3)
+
+        weno_eps = kwargs.pop('weno_eps', 1e-8)
+        # start writing
+        if not self.is_fully_specified():
+            print(self.get_index_parameters())
+            raise RuntimeError("Missing parameters")
+
+        unitname = 'unit_' + str(self._unit_id).zfill(3)
+        with h5py.File(filename, 'a') as f:
+
+            subgroup_name = os.path.join("input", "model", unitname,"discretization")
+            if subgroup_name not in f:
+                f.create_group(subgroup_name)
+            column = f[subgroup_name]
+
+            # write integers
+            for n, v in integer_parameters.items():
+                name = n.upper()
+                pointer = np.array(v, dtype='i')
+                column.create_dataset(name,
+                                      data=pointer,
+                                      dtype='i')
+
+            # write doubles
+            for n, v in double_parameters.items():
+                name = n.upper()
+                pointer = np.array(v, dtype='d')
+                column.create_dataset(name,
+                                      data=pointer,
+                                      dtype='d')
+
+            # string
+            s = par_disc_type
+            dtype = 'S{}'.format(len(s) + 1)
+            pointer = np.array(s, dtype=dtype)
+            column.create_dataset('par_disc_type'.upper(),
+                                  data=pointer,
+                                  dtype=dtype)
+
+            # arrays for bounds
+            # TODO: this is fixed but it will have to change if multiple bounds are implemented
+            pointer = np.ones(self.num_components, dtype='i')
+            column.create_dataset('NBOUND',
+                                  data=pointer,
+                                  dtype='i')
+
+
+            weno = column.create_group("weno")
+
+            # write integers
+            for n, v in weno_parameters.items():
+                name = n.upper()
+                pointer = np.array(v, dtype='i')
+                weno.create_dataset(name,
+                                    data=pointer,
+                                    dtype='i')
+
+            name = 'WENO_EPS'
+            pointer = np.array(weno_eps, dtype='d')
+            weno.create_dataset(name,
+                                data=pointer,
+                                dtype='d')
+
+        self._discretized = True
+
+    def write_return_to_cadet_input_file(self,
+                                         filename,
+                                         concentrations='in_out',
+                                         sensitivities='in_out'):
+
+        self._check_model()
+        if not self.is_fully_specified():
+            print(self.get_index_parameters())
+            raise RuntimeError("Missing parameters")
+
+        if concentrations == 'in_out':
+            list_inputs_c = ['WRITE_SOLUTION_COLUMN_INLET',
+                             'WRITE_SOLUTION_COLUMN_OUTLET']
+        elif concentrations == 'all':
+            list_inputs_c = ['WRITE_SOLUTION_COLUMN',
+                             'WRITE_SOLUTION_PARTICLE',
+                             'WRITE_SOLUTION_FLUX']
+        elif concentrations == 'none':
+            list_inputs_c = []
+        else:
+            raise RuntimeError("input not recognized")
+
+        if sensitivities == 'in_out':
+            list_inputs_s = ['WRITE_SENS_COLUMN_INLET',
+                             'WRITE_SENS_COLUMN_OUTLET']
+        elif sensitivities == 'all':
+            list_inputs_s = ['WRITE_SENS_COLUMN',
+                             'WRITE_SENS_PARTICLE',
+                             'WRITE_SENS_FLUX']
+        elif sensitivities == 'none':
+            list_inputs_s = []
+        else:
+            raise RuntimeError("input not recognized")
+
+        all_datasets = ['WRITE_SOLUTION_COLUMN_INLET',
+                        'WRITE_SOLUTION_COLUMN_OUTLET',
+                        'WRITE_SOLUTION_COLUMN',
+                        'WRITE_SOLUTION_PARTICLE',
+                        'WRITE_SOLUTION_FLUX',
+                        'WRITE_SOLDOT_COLUMN_INLET',
+                        'WRITE_SOLDOT_COLUMN_OUTLET',
+                        'WRITE_SOLDOT_COLUMN',
+                        'WRITE_SOLDOT_PARTICLE',
+                        'WRITE_SOLDOT_FLUX',
+                        'WRITE_SENS_COLUMN_INLET',
+                        'WRITE_SENS_COLUMN_OUTLET',
+                        'WRITE_SENS_COLUMN',
+                        'WRITE_SENS_PARTICLE',
+                        'WRITE_SENS_FLUX',
+                        'WRITE_SENSDOT_COLUMN_INLET',
+                        'WRITE_SENSDOT_COLUMN_OUTLET',
+                        'WRITE_SENSDOT_COLUMN',
+                        'WRITE_SENSDOT_PARTICLE',
+                        'WRITE_SENSDOT_FLUX']
+
+        data_sets_dict = dict()
+        for n in all_datasets:
+            data_sets_dict[n] = 0
+
+        for n in list_inputs_c:
+            data_sets_dict[n] = 1
+
+        for n in list_inputs_s:
+            data_sets_dict[n] = 1
+
+        unitname = 'unit_' + str(self._unit_id).zfill(3)
+        with h5py.File(filename, 'a') as f:
+
+            subgroup_name = os.path.join("input", "return", unitname)
+            if subgroup_name not in f:
+                f.create_group(subgroup_name)
+            column = f[subgroup_name]
+
+            for p, v in data_sets_dict.items():
+                name = p.upper()
+                pointer = np.array(v, dtype='i')
+                column.create_dataset(name,
+                                      data=pointer,
+                                      dtype='i')
+
 
 @UnitOperation.register
 class Outlet(UnitOperation):
@@ -522,6 +707,36 @@ class Outlet(UnitOperation):
         Append UnitOperation to cadet hdf5 input file
         :param filename: name of cadet hdf5 input file
         """
-        print("TODO")
+
+        self._check_model()
+        if not self.is_fully_specified():
+            print(self.get_index_parameters())
+            raise RuntimeError("Missing parameters")
+
+        unitname = 'unit_' + str(self._unit_id).zfill(3)
+        with h5py.File(filename, 'a') as f:
+
+            subgroup_name = os.path.join("input", "model", unitname)
+            if subgroup_name not in f:
+                f.create_group(subgroup_name)
+            outlet = f[subgroup_name]
+
+            # scalar parameters
+            # strings
+            # unit type
+            s = str(self._unit_type)
+            dtype = 'S{}'.format(len(s) + 1)
+            pointer = np.array(s, dtype=dtype)
+            outlet.create_dataset('UNIT_TYPE',
+                                  data=pointer,
+                                  dtype=dtype)
+            # integers
+            value = self.num_components
+            pointer = np.array(value, dtype='i')
+            outlet.create_dataset('NCOMP',
+                                  data=pointer,
+                                  dtype='i')
+
+            # flow not added!! is it needed?
 
 

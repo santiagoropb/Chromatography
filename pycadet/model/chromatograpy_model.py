@@ -2,18 +2,17 @@ from __future__ import print_function
 from pycadet.model.registrar import Registrar
 from pycadet.model.binding_model import BindingModel
 from pycadet.model.section import Section
-from pycadet.model.unit_operation import UnitOperation, Column
+from pycadet.model.unit_operation import UnitOperation
 from pycadet.utils import parse_utils
-from collections import OrderedDict
-import pandas as pd
-import collections
+import numpy as np
 import warnings
 import logging
-import numbers
 import weakref
+import h5py
 import copy
 import six
 import abc
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +44,8 @@ class ChromatographyModel(abc.ABC):
         self._units = list()
 
         self._ordered_ids_for_cadet = list()
+
+        self._connections = list()
 
         # add passed components
         if components is not None:
@@ -98,6 +99,27 @@ class ChromatographyModel(abc.ABC):
         Returns number of scalar parameters
         """
         return len(self.get_scalar_parameters(with_defaults=False))
+
+    @property
+    def num_sections(self):
+        """
+        Returns number of sections
+        """
+        return len(self._sections)
+
+    @property
+    def num_units(self):
+        """
+        Returns number of units
+        """
+        return len(self._units)
+
+    @property
+    def num_binding_models(self):
+        """
+        Returns number of binding models
+        """
+        return len(self._binding_models)
 
     @staticmethod
     def _parse_inputs(inputs):
@@ -230,7 +252,141 @@ class ChromatographyModel(abc.ABC):
 
     def binding_models(self):
         for n in self._binding_models:
-            yield n, getattr(self,n)
+            yield n, getattr(self, n)
+
+    def list_sections(self):
+        return [n for n in self._sections]
+
+    def sections(self):
+        for n in self._sections:
+            yield n, getattr(self, n)
+
+    def list_unit_operations(self):
+        return [n for n in self._units]
+
+    def unit_operations(self):
+        for n in self._units:
+            yield n, getattr(self, n)
+
+    def write_connections_to_cadet_input_file(self, filename, active_sec):
+
+        with h5py.File(filename, 'a') as f:
+            subgroup_name = os.path.join("input", "connections")
+            if subgroup_name not in f:
+                f.create_group(subgroup_name)
+            connections = f[subgroup_name]
+
+            # TODO: ask about this number of switches
+            name = 'NSWITCHES'
+            pointer = np.array(1, dtype='i')
+            connections.create_dataset(name,
+                                       data=pointer,
+                                       dtype='i')
+
+            connections.create_group("switch_000")
+
+            name = 'CONNECTIONS'
+            pointer = np.array(self._connections,dtype='i')
+            connections.create_dataset(name,
+                                       data=pointer,
+                                       dtype='i')
+
+            name = 'SECTION'
+            sec = getattr(self, active_sec)
+            pointer = np.array(sec._section_id, dtype='i')
+            connections.create_dataset(name,
+                                       data=pointer,
+                                       dtype='i')
+
+    def write_solver_info_to_cadet_input_file(self, filename, tspan, **kwargs):
+
+        n_threads = kwargs.pop('nthreads', Registrar.solver_defaults['nthreads'])
+
+        time_integrator_double_params  = dict()
+        list_params = ['abstol',
+                       'algtol',
+                       'init_step_size',
+                       'reltol']
+        for n in list_params:
+            time_integrator_double_params[n] = kwargs.pop(n, Registrar.solver_defaults[n])
+
+        n = 'max_steps'
+        time_integrator_int_params = {n: kwargs.pop(n, Registrar.solver_defaults[n])}
+
+        with h5py.File(filename, 'a') as f:
+            subgroup_name = os.path.join("input", "solver")
+
+            if subgroup_name not in f:
+                f.create_group(subgroup_name)
+            solver = f[subgroup_name]
+
+            name = 'NTHREADS'
+            pointer = np.array(n_threads, dtype='i')
+            solver.create_dataset(name,
+                                  data=pointer,
+                                  dtype='i')
+
+            name = 'USER_SOLUTION_TIMES'
+            if isinstance(tspan, np.ndarray):
+                pointer = tspan
+            else:
+                pointer = np.array(tspan, dtype='d')
+            solver.create_dataset(name,
+                                  data=pointer,
+                                  dtype='d')
+
+            sections = solver.create_group("sections")
+            name = 'NSEC'
+            v = self.num_sections
+            pointer = np.array(v, dtype='i')
+            sections.create_dataset(name,
+                                    data=pointer,
+                                    dtype='i')
+
+            name = 'SECTION_CONTINUITY'
+            pointer = np.zeros(self.num_sections-1, 'i')
+            sections.create_dataset(name,
+                                    data=pointer,
+                                    dtype='i')
+
+            sec_times = np.zeros(self.num_sections,dtype='d')
+            for n, sec in self.sections():
+                sec_id = sec._section_id
+                sec_times[sec_id] = sec.start_time_sec
+
+            name = 'SECTION_TIMES'
+            pointer = sec_times
+            sections.create_dataset(name,
+                                    data=pointer,
+                                    dtype='d')
+
+            time_integrator = solver.create_group("time_integrator")
+
+            # write integers
+            for n, v in time_integrator_int_params.items():
+                name = n.upper()
+                pointer = np.array(v, dtype='i')
+                time_integrator.create_dataset(name,
+                                               data=pointer,
+                                               dtype='i')
+
+            # write double
+            for n, v in time_integrator_double_params.items():
+                name = n.upper()
+                pointer = np.array(v, dtype='d')
+                time_integrator.create_dataset(name,
+                                               data=pointer,
+                                               dtype='d')
+
+    def connect_unit_operations(self, name_from, name_to):
+
+        ufrom = getattr(self, name_from)
+        uto = getattr(self, name_to)
+
+        connection = [ufrom.unit_id, uto.unit_id, -1, -1]
+        for i in connection:
+            self._connections.append(i)
+
 
     def __setattr__(self, name, value):
         # TODO: add warning if overwriting name?

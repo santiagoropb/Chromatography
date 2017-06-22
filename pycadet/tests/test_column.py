@@ -339,7 +339,7 @@ class TestColumn(unittest.TestCase):
 
         # read back and verify output
         with h5py.File(filename, 'r') as f:
-            unitname = str(col._unit_id).zfill(3)
+            unitname = 'unit_'+str(col._unit_id).zfill(3)
             path = os.path.join("input", "model", unitname)
 
             strings = dict()

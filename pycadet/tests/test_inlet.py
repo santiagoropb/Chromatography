@@ -3,6 +3,7 @@ from pycadet.model.section import Section
 from pycadet.model.unit_operation import Inlet
 from pycadet.utils.compare import equal_dictionaries, pprint_dict
 from collections import OrderedDict
+import numpy as np
 import unittest
 import tempfile
 import yaml
@@ -42,7 +43,6 @@ class TestInlet(unittest.TestCase):
 
         GRM.inlet = Inlet(components=self.model_components)
 
-
     def test_num_sections(self):
 
         GRM = self.m
@@ -54,6 +54,58 @@ class TestInlet(unittest.TestCase):
         GRM.inlet.add_section('elute')
         self.assertEqual(GRM.inlet.num_sections, 3)
 
-        #print(GRM.load.get_index_parameters())
-        #print(GRM.wash.get_index_parameters())
-        #print(GRM.elute.get_index_parameters())
+    def test_write_to_cadet(self):
+
+        inlet = self.m.inlet
+
+        test_dir = tempfile.mkdtemp()
+        filename = os.path.join(test_dir, "inlet_tmp.hdf5")
+
+        inlet.write_to_cadet_input_file(filename)
+
+        # read back and verify output
+        with h5py.File(filename, 'r') as f:
+            unitname = 'unit_'+str(inlet._unit_id).zfill(3)
+
+            path = os.path.join("input", "model", unitname)
+
+            strings = dict()
+
+            s = str(inlet._unit_type)
+            dtype = 'S{}'.format(len(s) + 1)
+            pointer = np.array(s, dtype=dtype)
+            strings['UNIT_TYPE'] = pointer
+
+            s = str(inlet._inlet_type)
+            dtype = 'S{}'.format(len(s) + 1)
+            pointer = np.array(s, dtype=dtype)
+            strings['INLET_TYPE'] = pointer
+
+            for name, v in strings.items():
+                dataset = os.path.join(path, name)
+                # check unit type
+                print(dataset)
+                read = f[dataset].value
+                self.assertEqual(read, v)
+
+            # integers
+            name = 'NCOMP'
+            dataset = os.path.join(path, name)
+            read = f[dataset].value
+            self.assertEqual(read, inlet.num_components)
+
+            for s in inlet.list_sections():
+                section = inlet.get_section(s)
+                section_name = 'sec_'+str(section._section_id).zfill(3)
+                path = os.path.join("input", "model", unitname, section_name)
+
+                list_params = list(section._registered_index_parameters)
+                for p in list_params:
+                    name = p.upper()
+                    dataset = os.path.join(path, name)
+                    read = f[dataset]
+                    for i, e in enumerate(read):
+                        comp_id = self.m._ordered_ids_for_cadet[i]
+                        comp_name = self.m._comp_id_to_name[comp_id]
+                        value = section.get_index_parameter(comp_name, p)
+                        self.assertEqual(value, e)
