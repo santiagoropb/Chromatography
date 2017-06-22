@@ -1,14 +1,11 @@
 from pycadet.model.chromatograpy_model import GRModel
 from pycadet.model.section import Section
-from pycadet.model.unit_operation import Inlet
-from pycadet.utils.compare import equal_dictionaries, pprint_dict
+from pycadet.model.unit_operation import Inlet, UnitOperationType, InletType
 from collections import OrderedDict
 import numpy as np
 import unittest
 import tempfile
-import yaml
 import h5py
-import shutil
 import os
 
 
@@ -42,6 +39,14 @@ class TestInlet(unittest.TestCase):
         GRM.elute.set_a1('salt', 0.2)
 
         GRM.inlet = Inlet(components=self.model_components)
+
+    def test_unit_type(self):
+        inlet = self.m.inlet
+        self.assertEqual(inlet._unit_type, UnitOperationType.INLET)
+
+    def test_inlet_type(self):
+        inlet = self.m.inlet
+        self.assertEqual(inlet._inlet_type, InletType.PIECEWISE_CUBIC_POLY)
 
     def test_num_sections(self):
 

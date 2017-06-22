@@ -1,4 +1,4 @@
-from pycadet.model.unit_operation import Column
+from pycadet.model.unit_operation import Column, UnitOperationType
 from pycadet.model.chromatograpy_model import GRModel
 from pycadet.model.binding_model import SMABinding
 from pycadet.utils.compare import equal_dictionaries, pprint_dict
@@ -74,6 +74,12 @@ class TestColumn(unittest.TestCase):
 
         GRM = cls.m
         GRM.binding = SMABinding(data=cls.sma_data)
+
+    def test_unit_type(self):
+        GRM = self.m
+        GRM.column = Column(data=self.test_data)
+        col = GRM.column
+        self.assertEqual(col._unit_type, UnitOperationType.COLUMN)
 
     def setUp(self):
 
@@ -393,5 +399,110 @@ class TestColumn(unittest.TestCase):
                     comp_name = GRM._comp_id_to_name[comp_id]
                     value = self.test_data['index parameters'][comp_name][p]
                     self.assertEqual(value, e)
+
+    def test_write_return_to_cadet_file(self):
+
+        GRM = self.m
+        GRM.salt = 'salt'
+        GRM.column = Column(data=self.test_data)
+        col = GRM.column
+
+        test_dir = tempfile.mkdtemp()
+
+        all_datasets = ['WRITE_SOLUTION_COLUMN_INLET',
+                        'WRITE_SOLUTION_COLUMN_OUTLET',
+                        'WRITE_SOLUTION_COLUMN',
+                        'WRITE_SOLUTION_PARTICLE',
+                        'WRITE_SOLUTION_FLUX',
+                        'WRITE_SOLDOT_COLUMN_INLET',
+                        'WRITE_SOLDOT_COLUMN_OUTLET',
+                        'WRITE_SOLDOT_COLUMN',
+                        'WRITE_SOLDOT_PARTICLE',
+                        'WRITE_SOLDOT_FLUX',
+                        'WRITE_SENS_COLUMN_INLET',
+                        'WRITE_SENS_COLUMN_OUTLET',
+                        'WRITE_SENS_COLUMN',
+                        'WRITE_SENS_PARTICLE',
+                        'WRITE_SENS_FLUX',
+                        'WRITE_SENSDOT_COLUMN_INLET',
+                        'WRITE_SENSDOT_COLUMN_OUTLET',
+                        'WRITE_SENSDOT_COLUMN',
+                        'WRITE_SENSDOT_PARTICLE',
+                        'WRITE_SENSDOT_FLUX']
+
+        filename = os.path.join(test_dir, "col_return_tmp1.hdf5")
+        col.write_return_to_cadet_input_file(filename)
+
+        # test with defaults
+        # read back and verify output
+        with h5py.File(filename, 'r') as f:
+            unitname = 'unit_' + str(col._unit_id).zfill(3)
+            path = os.path.join("input", "return", unitname)
+
+            data_sets_dict = dict()
+            for n in all_datasets:
+                data_sets_dict[n] = 0
+
+            list_inputs_c = ['WRITE_SOLUTION_COLUMN_INLET',
+                             'WRITE_SOLUTION_COLUMN_OUTLET']
+
+            list_inputs_s = ['WRITE_SENS_COLUMN_INLET',
+                             'WRITE_SENS_COLUMN_OUTLET']
+
+            for n in list_inputs_c:
+                data_sets_dict[n] = 1
+
+            for n in list_inputs_s:
+                data_sets_dict[n] = 1
+
+            for p, v in data_sets_dict.items():
+                name = p.upper()
+                dataset = os.path.join(path, name)
+                read = f[dataset].value
+                self.assertEqual(read, v)
+
+        # test with defaults
+        filename = os.path.join(test_dir, "col_return_tmp2.hdf5")
+        col.write_return_to_cadet_input_file(filename,
+                                             concentrations='all',
+                                             sensitivities='all')
+
+        with h5py.File(filename, 'r') as f:
+            unitname = 'unit_' + str(col._unit_id).zfill(3)
+            path = os.path.join("input", "return", unitname)
+
+            data_sets_dict = dict()
+            for n in all_datasets:
+                data_sets_dict[n] = 0
+
+            list_inputs_c = ['WRITE_SOLUTION_COLUMN',
+                             'WRITE_SOLUTION_PARTICLE',
+                             'WRITE_SOLUTION_FLUX']
+
+            list_inputs_s = ['WRITE_SENS_COLUMN',
+                             'WRITE_SENS_PARTICLE',
+                             'WRITE_SENS_FLUX']
+
+            for n in list_inputs_c:
+                data_sets_dict[n] = 1
+
+            for n in list_inputs_s:
+                data_sets_dict[n] = 1
+
+            for p, v in data_sets_dict.items():
+                name = p.upper()
+                dataset = os.path.join(path, name)
+                read = f[dataset].value
+                self.assertEqual(read, v)
+
+
+
+
+
+
+
+
+
+
 
 

@@ -232,7 +232,7 @@ class Column(UnitOperation):
                                           columns=self._registered_index_parameters)
 
         # Define type of unit operation
-        self._unit_type = UnitOperationType.INLET
+        self._unit_type = UnitOperationType.COLUMN
 
         if self.num_sections > 0:
             raise RuntimeError('Multiple sections per column not supported yet')
