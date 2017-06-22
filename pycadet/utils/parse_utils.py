@@ -27,20 +27,15 @@ def parse_inputs(inputs):
 
 def parse_scalar_inputs_from_dict(dict_inputs,
                                   class_name,
-                                  registered_inputs,
-                                  logger):
+                                  registered_inputs):
 
     parsed_scalar = dict()
     if dict_inputs is not None:
         for name, val in dict_inputs.items():
             msg = """{} is not a scalar parameter 
-                        of {}""".format(name, class_name)
+            of {}""".format(name, class_name)
             assert name in registered_inputs, msg
             parsed_scalar[name] = val
-    else:
-        msg = """No scalar parameters specified 
-                    when parsing {}""".format(class_name)
-        logger.debug(msg)
 
     return parsed_scalar
 

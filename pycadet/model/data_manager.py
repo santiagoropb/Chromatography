@@ -97,15 +97,10 @@ class DataManager(object):
             registered_inputs = self._registered_scalar_parameters
             parsed = parse_utils.parse_scalar_inputs_from_dict(sparams,
                                                                self.__class__.__name__,
-                                                               registered_inputs,
-                                                               logger)
+                                                               registered_inputs)
 
             for k, v in parsed.items():
                 self._scalar_params[k] = v
-        else:
-            msg = """ No inputs when _parse_scalar_parameters
-                was called in {}""".format(self.__class__.__name__)
-            logger.debug(msg)
 
     def _parse_index_parameters(self):
 

@@ -1,6 +1,7 @@
 from pycadet.model.unit_operation import Column, UnitOperationType
 from pycadet.model.chromatograpy_model import GRModel
 from pycadet.model.binding_model import SMABinding
+from pycadet.model.registrar import Registrar
 from pycadet.utils.compare import equal_dictionaries, pprint_dict
 from collections import OrderedDict
 import numpy as np
@@ -160,6 +161,9 @@ class TestColumn(unittest.TestCase):
 
         with open(filename, 'w') as outfile:
             yaml.dump(self.test_data, outfile, default_flow_style=False)
+
+        #with open("column.yml", 'w') as outfile:
+        #    yaml.dump(self.test_data, outfile, default_flow_style=False)
 
         GRM = self.m
         GRM.column = Column(data=self.test_data)
@@ -494,6 +498,110 @@ class TestColumn(unittest.TestCase):
                 dataset = os.path.join(path, name)
                 read = f[dataset].value
                 self.assertEqual(read, v)
+
+    def test_write_discretization_to_cadet_input_file(self):
+
+        GRM = self.m
+        GRM.salt = 'salt'
+        GRM.column = Column(data=self.test_data)
+        col = GRM.column
+
+        test_dir = tempfile.mkdtemp()
+
+        filename = os.path.join(test_dir, "col_disc_tmp.hdf5")
+
+        kwargs = dict()
+        reg_disc = Registrar.discretization_defaults
+        reg_weno = Registrar.weno_defaults
+
+
+        int_params = ['use_analytic_jacobian',
+                      'gs_type',
+                      'max_krylov',
+                      'max_restart']
+
+        int_weno = ['boundary_model',
+                    'weno_order']
+
+        double_params = ['schur_safety']
+
+        double_weno = ['weno_eps']
+
+        string_params = ['par_disc_type']
+
+        for n in int_params+double_params+string_params:
+            kwargs[n] = reg_disc[n]
+
+        for n in int_weno+double_weno:
+            kwargs[n] = reg_weno[n]
+
+        ncol = 50
+        npar = 10
+        col.write_discretization_to_cadet_input_file(filename,
+                                                     ncol,
+                                                     npar,
+                                                     **kwargs)
+
+        with h5py.File(filename, 'r') as f:
+            unitname = 'unit_' + str(col._unit_id).zfill(3)
+            path = os.path.join("input", "model", unitname, "discretization")
+
+            # check integer parameters
+            for n in int_params:
+                name = n.upper()
+                v = kwargs[n]
+                dataset = os.path.join(path, name)
+                read = f[dataset].value
+                self.assertEqual(read, v)
+
+            name = 'NCOL'
+            v = ncol
+            dataset = os.path.join(path, name)
+            read = f[dataset].value
+            self.assertEqual(read, v)
+
+            name = 'NPAR'
+            v = npar
+            dataset = os.path.join(path, name)
+            read = f[dataset].value
+            self.assertEqual(read, v)
+
+            # check double parameters
+            for n in double_params:
+                name = n.upper()
+                v = kwargs[n]
+                dataset = os.path.join(path, name)
+                read = f[dataset].value
+                self.assertEqual(read, v)
+
+            # check integer parameters
+            for n in string_params:
+                name = n.upper()
+                v = kwargs[n].encode()
+                dataset = os.path.join(path, name)
+                read = f[dataset].value
+                self.assertEqual(read, v)
+
+            #check weno parameters
+            for n in int_weno:
+                name = n.upper()
+                v = kwargs[n]
+                dataset = os.path.join(path, "weno", name)
+                read = f[dataset].value
+                self.assertEqual(read, v)
+
+            # check weno parameters
+            for n in double_weno:
+                name = n.upper()
+                v = kwargs[n]
+                dataset = os.path.join(path, "weno", name)
+                read = f[dataset].value
+                self.assertEqual(read, v)
+
+
+
+
+
 
 
 

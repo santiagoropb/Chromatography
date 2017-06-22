@@ -104,6 +104,9 @@ class TestBindingModel(unittest.TestCase):
         with open(filename, 'w') as outfile:
             yaml.dump(self.test_data, outfile, default_flow_style=False)
 
+        #with open("sma.yml", 'w') as outfile:
+        #    yaml.dump(self.test_data, outfile, default_flow_style=False)
+
         GRM = self.m
         GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding

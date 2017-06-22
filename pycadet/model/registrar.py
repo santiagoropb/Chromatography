@@ -125,7 +125,16 @@ class Registrar(object):
     discretization_defaults['schur_safety'] = 1e-8
     discretization_defaults['use_analytic_jacobian'] = 1
     discretization_defaults['par_disc_type'] = 'EQUIDISTANT_PAR'
-    #discretization_defaults['reconstruction'] = 'WENO'
+
+    weno_parameters = set()
+    weno_parameters.add('boundary_model')
+    weno_parameters.add('weno_order')
+    weno_parameters.add('weno_eps')
+
+    weno_defaults = dict()
+    weno_defaults['boundary_model'] = 0
+    weno_defaults['weno_order'] = 3
+    weno_defaults['weno_eps'] = 1e-8
 
 
         

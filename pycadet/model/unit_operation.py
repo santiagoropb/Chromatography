@@ -526,13 +526,13 @@ class Column(UnitOperation):
 
         double_parameters = dict()
         reg_disc = Registrar.discretization_defaults
-        double_parameters['schur-safety'] = kwargs.pop('schur-safety', reg_disc['schur-safety'])
+        reg_weno = Registrar.weno_defaults
+        double_parameters['schur_safety'] = kwargs.pop('schur_safety', reg_disc['schur_safety'])
 
-        int_params = ['par_disc_type',
-                      'use_analytic_jacobian',
+        int_params = ['use_analytic_jacobian',
                       'gs_type',
                       'max_krylov',
-                      'max_restarts']
+                      'max_restart']
 
         par_disc_type = kwargs.pop('par_disc_type', 'EQUIDISTANT_PAR')
 
@@ -544,10 +544,12 @@ class Column(UnitOperation):
         integer_parameters['npar'] = npar
 
         weno_parameters = dict()
-        weno_parameters['boundary_model'] = kwargs.pop('boundary_model',0)
-        weno_parameters['weno_order'] = kwargs.pop('weno_order', 3)
+        weno_parameters['boundary_model'] = kwargs.pop('boundary_model',
+                                                       reg_weno['boundary_model'])
+        weno_parameters['weno_order'] = kwargs.pop('weno_order',
+                                                   reg_weno['weno_order'])
 
-        weno_eps = kwargs.pop('weno_eps', 1e-8)
+        weno_eps = kwargs.pop('weno_eps', reg_weno['weno_eps'])
         # start writing
         if not self.is_fully_specified():
             print(self.get_index_parameters())
@@ -556,7 +558,7 @@ class Column(UnitOperation):
         unitname = 'unit_' + str(self._unit_id).zfill(3)
         with h5py.File(filename, 'a') as f:
 
-            subgroup_name = os.path.join("input", "model", unitname,"discretization")
+            subgroup_name = os.path.join("input", "model", unitname, "discretization")
             if subgroup_name not in f:
                 f.create_group(subgroup_name)
             column = f[subgroup_name]

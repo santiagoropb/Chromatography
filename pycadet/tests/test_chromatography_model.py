@@ -1,6 +1,10 @@
 from pycadet.model.chromatograpy_model import ChromatographyModel, GRModel
+from pycadet.model.unit_operation import Inlet, Column
+from pycadet.model.section import Section
 from pycadet.utils.compare import equal_dictionaries, pprint_dict
+from pycadet.model.registrar import Registrar
 from collections import OrderedDict
+import numpy as np
 import unittest
 import tempfile
 import yaml
@@ -83,3 +87,156 @@ class TestChromatographyModel(unittest.TestCase):
         m.salt = 'salt'
         self.assertTrue(m.is_salt('salt'))
         self.assertFalse(m.is_salt('blah'))
+
+    def test_solver_info_to_cadet_input(self):
+        m = GRModel(data=self.test_data)
+
+        comps = self.test_data['components']
+        m.load = Section(components=comps)
+        for cname in comps:
+            m.load.set_a0(cname, 1.0)
+        m.load.set_a0('salt', 50.0)
+        m.load.start_time_sec = 0.0
+
+        m.wash = Section(components=comps)
+        m.wash.set_a0('salt', 50.0)
+        m.wash.start_time_sec = 1.0
+
+        m.elute = Section(components=comps)
+        m.elute.set_a0('salt', 100.0)
+        m.elute.set_a1('salt', 0.2)
+        m.elute.start_time_sec = 3.0
+
+        reg_solver = Registrar.solver_defaults
+
+        n_threads = reg_solver['nthreads']
+        kwargs = dict()
+        kwargs['nthreads'] = n_threads
+        user_times = range(10)
+
+        double_params = ['abstol',
+                         'algtol',
+                         'init_step_size',
+                         'reltol']
+
+        for n in double_params:
+            kwargs[n] = reg_solver[n]
+
+        int_params = ['max_steps']
+        for n in int_params:
+            kwargs[n] = reg_solver[n]
+
+        test_dir = tempfile.mkdtemp()
+        filename = os.path.join(test_dir, "solver_tmp.hdf5")
+        m.write_solver_info_to_cadet_input_file(filename, user_times, **kwargs)
+
+        # read back and verify output
+        with h5py.File(filename, 'r') as f:
+            path = os.path.join("input", "solver")
+
+            # integers
+            name = 'NTHREADS'
+            dataset = os.path.join(path, name)
+            print(dataset)
+            read = f[dataset].value
+            self.assertEqual(read, kwargs['nthreads'])
+
+            # user times
+            name = 'USER_SOLUTION_TIMES'
+            dataset = os.path.join(path, name)
+            read = f[dataset]
+            for i, t in enumerate(read):
+                self.assertEqual(user_times[i], t)
+
+            # sections
+            name = 'NSEC'
+            dataset = os.path.join(path, "sections", name)
+            read = f[dataset].value
+            self.assertEqual(read, m.num_sections)
+
+            name = 'SECTION_CONTINUITY'
+            pointer = np.zeros(m.num_sections - 1, 'i')
+            dataset = os.path.join(path, "sections", name)
+            read = f[dataset]
+            for i, t in enumerate(read):
+                self.assertEqual(pointer[i], t)
+
+            sec_times = np.zeros(m.num_sections, dtype='d')
+            for n, sec in m.sections():
+                sec_id = sec._section_id
+                sec_times[sec_id] = sec.start_time_sec
+
+            name = 'SECTION_TIMES'
+            dataset = os.path.join(path, "sections", name)
+            read = f[dataset]
+            for i, t in enumerate(read):
+                self.assertEqual(sec_times[i], t)
+
+            # time integrator
+            for n in int_params:
+                name = n.upper()
+                dataset = os.path.join(path, "time_integrator", name)
+                read = f[dataset].value
+                self.assertEqual(read, kwargs[n])
+
+            for n in double_params:
+                name = n.upper()
+                dataset = os.path.join(path, "time_integrator", name)
+                read = f[dataset].value
+                self.assertEqual(read, kwargs[n])
+
+    @unittest.skip("not finished")
+    def test_write_connections_to_cadet_input(self):
+
+        m = GRModel(data=self.test_data)
+
+        comps = self.test_data['components']
+        m.load = Section(components=comps)
+        for cname in comps:
+            m.load.set_a0(cname, 1.0)
+        m.load.set_a0('salt', 50.0)
+        m.load.start_time_sec = 0.0
+
+        m.wash = Section(components=comps)
+        m.wash.set_a0('salt', 50.0)
+        m.wash.start_time_sec = 1.0
+
+        m.elute = Section(components=comps)
+        m.elute.set_a0('salt', 100.0)
+        m.elute.set_a1('salt', 0.2)
+        m.elute.start_time_sec = 3.0
+
+        m.inlet = Inlet(components=comps)
+        m.column = Column(components=comps)
+        m.connect_unit_operations('inlet', 'column')
+
+        # TODO: add check number of connections is at least the minimum
+        if not m.num_units:
+            msg = "Cannot write connections. There is no Units"
+            raise RuntimeError(msg)
+
+        test_dir = tempfile.mkdtemp()
+        filename = os.path.join(test_dir, "connections_tmp.hdf5")
+
+        m.write_connections_to_cadet_input_file(filename, 'load')
+        # read back and verify output
+        with h5py.File(filename, 'r') as f:
+            path = os.path.join("input", "connections")
+
+            # switches
+            # TODO: verify how is this computed
+            name = 'NSWITCHES'
+            dataset = os.path.join(path, name)
+            read = f[dataset].value
+            self.assertEqual(read, 1)
+
+            name = 'CONNECTIONS'
+            dataset = os.path.join(path, "switch_000", name)
+            read = f[dataset]
+            for i, c in read:
+                self.assertEqual(c, m._connections[i])
+
+            name = 'SECTION'
+            sec_id = m.load._section_id
+
+

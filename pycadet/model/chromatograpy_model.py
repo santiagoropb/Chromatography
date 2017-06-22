@@ -141,8 +141,7 @@ class ChromatographyModel(abc.ABC):
         registered_inputs = self._registered_scalar_parameters
         parsed = parse_utils.parse_scalar_inputs_from_dict(sparams,
                                                            self.__class__.__name__,
-                                                           registered_inputs,
-                                                           logger)
+                                                           registered_inputs)
 
         for k, v in parsed.items():
             self._scalar_params[k] = v
@@ -286,7 +285,7 @@ class ChromatographyModel(abc.ABC):
             connections.create_group("switch_000")
 
             name = 'CONNECTIONS'
-            pointer = np.array(self._connections,dtype='i')
+            pointer = np.array(self._connections, dtype='i')
             connections.create_dataset(name,
                                        data=pointer,
                                        dtype='i')
@@ -300,9 +299,17 @@ class ChromatographyModel(abc.ABC):
 
     def write_solver_info_to_cadet_input_file(self, filename, tspan, **kwargs):
 
+        for n, sec in self.sections():
+            if np.isnan(sec.start_time_sec):
+                msg = """Cannot write file. 
+                Section {} does
+                not have a start time.
+                """.format(n)
+                raise RuntimeError(msg)
+
         n_threads = kwargs.pop('nthreads', Registrar.solver_defaults['nthreads'])
 
-        time_integrator_double_params  = dict()
+        time_integrator_double_params = dict()
         list_params = ['abstol',
                        'algtol',
                        'init_step_size',
@@ -349,7 +356,7 @@ class ChromatographyModel(abc.ABC):
                                     data=pointer,
                                     dtype='i')
 
-            sec_times = np.zeros(self.num_sections,dtype='d')
+            sec_times = np.zeros(self.num_sections, dtype='d')
             for n, sec in self.sections():
                 sec_id = sec._section_id
                 sec_times[sec_id] = sec.start_time_sec
@@ -386,7 +393,6 @@ class ChromatographyModel(abc.ABC):
         connection = [ufrom.unit_id, uto.unit_id, -1, -1]
         for i in connection:
             self._connections.append(i)
-
 
     def __setattr__(self, name, value):
         # TODO: add warning if overwriting name?
