@@ -1,14 +1,14 @@
-This is a DIPT package
+This is Pychrom!
 ======================
 
-Project Lead: 
-Team Members:
-TODO
-
-Name
-----
+[![Build Status](https://travis-ci.org/santiagoropb/Chromatography.svg?branch=master)](https://travis-ci.org/santiagoropb/Chromatography)
 
 Python package for chromatography modeling and optimization
 
-TODO
+Organization
+------------
+
+Modeling for Preparative Chromatography
+
+
 
