@@ -282,20 +282,21 @@ class ChromatographyModel(abc.ABC):
                                        data=pointer,
                                        dtype='i')
 
-            connections.create_group("switch_000")
+            switch = connections.create_group("switch_000")
 
             name = 'CONNECTIONS'
             pointer = np.array(self._connections, dtype='i')
-            connections.create_dataset(name,
-                                       data=pointer,
-                                       dtype='i')
+            print(pointer)
+            switch.create_dataset(name,
+                                  data=pointer,
+                                  dtype='i')
 
             name = 'SECTION'
             sec = getattr(self, active_sec)
             pointer = np.array(sec._section_id, dtype='i')
-            connections.create_dataset(name,
-                                       data=pointer,
-                                       dtype='i')
+            switch.create_dataset(name,
+                                  data=pointer,
+                                  dtype='i')
 
     def write_solver_info_to_cadet_input_file(self, filename, tspan, **kwargs):
 

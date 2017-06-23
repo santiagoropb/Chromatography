@@ -137,7 +137,6 @@ class TestChromatographyModel(unittest.TestCase):
             # integers
             name = 'NTHREADS'
             dataset = os.path.join(path, name)
-            print(dataset)
             read = f[dataset].value
             self.assertEqual(read, kwargs['nthreads'])
 
@@ -185,7 +184,7 @@ class TestChromatographyModel(unittest.TestCase):
                 read = f[dataset].value
                 self.assertEqual(read, kwargs[n])
 
-    @unittest.skip("not finished")
+
     def test_write_connections_to_cadet_input(self):
 
         m = GRModel(data=self.test_data)
@@ -233,10 +232,14 @@ class TestChromatographyModel(unittest.TestCase):
             name = 'CONNECTIONS'
             dataset = os.path.join(path, "switch_000", name)
             read = f[dataset]
-            for i, c in read:
+            for i, c in enumerate(read):
                 self.assertEqual(c, m._connections[i])
 
             name = 'SECTION'
             sec_id = m.load._section_id
+            dataset = os.path.join(path, "switch_000", name)
+            read = f[dataset].value
+            self.assertEqual(read, sec_id)
+
 
 

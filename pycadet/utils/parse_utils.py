@@ -22,7 +22,7 @@ def parse_inputs(inputs):
     else:
         raise RuntimeError('inputs must be a dictionary or a file')
 
-    return args
+    return OrderedDict(args)
 
 
 def parse_scalar_inputs_from_dict(dict_inputs,

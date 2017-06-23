@@ -1,6 +1,7 @@
 from __future__ import print_function
 from pycadet.utils import parse_utils
 from pycadet.utils import pandas_utils as pd_utils
+from pycadet.utils.compare import  pprint_dict
 import numpy as np
 import warnings
 import pandas as pd
@@ -313,7 +314,7 @@ class DataManager(object):
 
         if self._index_params.empty:
             self._index_params = pd.DataFrame(index=[],
-                                              columns=self._registered_index_parameters)
+                                              columns=sorted(self._registered_index_parameters))
 
     def _initialize_containers(self):
 
@@ -327,6 +328,13 @@ class DataManager(object):
             return [k for k in self._components]
         else:
             return [self._model()._comp_id_to_name[k] for k in self._components]
+
+    def pprint(self):
+        print(self.num_scalar_parameters, "scalar parameters")
+        pprint_dict(self.get_scalar_parameters(with_defaults=True))
+        print(self.num_index_parameters, "index parameters")
+        print(self.get_index_parameters(with_defaults=True))
+
 
     def help(self):
         print("TODO")
