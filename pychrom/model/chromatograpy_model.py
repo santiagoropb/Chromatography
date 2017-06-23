@@ -6,6 +6,7 @@ from pychrom.model.section import Section
 from pychrom.utils import parse_utils
 import numpy as np
 import warnings
+import numbers
 import logging
 import weakref
 import h5py
@@ -20,6 +21,12 @@ logger = logging.getLogger(__name__)
 class ChromatographyModel(abc.ABC):
 
     def __init__(self, components=None):
+
+        # elements containers
+        self._binding_models = list()
+        self._sections = list()
+        self._units = list()
+        self._num_columns = 0
 
         # define registered params
         self._registered_scalar_parameters = Registrar.scalar_parameters
@@ -36,12 +43,6 @@ class ChromatographyModel(abc.ABC):
         self._components = set()
 
         self._salt_id = -1
-
-        self._binding_models =list()
-
-        self._sections = list()
-
-        self._units = list()
 
         self._ordered_ids_for_cadet = list()
 
@@ -113,6 +114,10 @@ class ChromatographyModel(abc.ABC):
         Returns number of units
         """
         return len(self._units)
+
+    @property
+    def num_columns(self):
+        return self._num_columns
 
     @property
     def num_binding_models(self):
@@ -276,10 +281,23 @@ class ChromatographyModel(abc.ABC):
                 if isinstance(u, unit_type):
                     yield n, u
 
-    def write_connections_to_cadet_input_file(self, filename, active_sec):
+    def _write_connections_to_cadet_input_file(self, filename, active_sec):
+
+        # checking all units connected
+        n_connections = len(self._connections)/4
+        minimum_con = n_connections*(n_connections-1)/2
+        set_connected = set()
+        for uid in self._connections:
+            if uid >= 0:
+                set_connected.add(uid)
+
+        for n, u in self.unit_operations():
+            if u._unit_id not in set_connected:
+                msg = "Unit {} is not connected".format(n)
+                raise RuntimeError(msg)
 
         with h5py.File(filename, 'a') as f:
-            subgroup_name = os.path.join("input", "connections")
+            subgroup_name = os.path.join("input", "model", "connections")
             if subgroup_name not in f:
                 f.create_group(subgroup_name)
             connections = f[subgroup_name]
@@ -307,7 +325,7 @@ class ChromatographyModel(abc.ABC):
                                   data=pointer,
                                   dtype='i')
 
-    def write_solver_info_to_cadet_input_file(self, filename, tspan, **kwargs):
+    def _write_solver_info_to_cadet_input_file(self, filename, tspan, **kwargs):
 
         for n, sec in self.sections():
             if np.isnan(sec.start_time_sec):
@@ -366,10 +384,12 @@ class ChromatographyModel(abc.ABC):
                                     data=pointer,
                                     dtype='i')
 
-            sec_times = np.zeros(self.num_sections, dtype='d')
+            # TODO: ask about this
+            sec_times = np.zeros(self.num_sections+1, dtype='d')
             for n, sec in self.sections():
                 sec_id = sec._section_id
                 sec_times[sec_id] = sec.start_time_sec
+            sec_times[-1] = tspan[-1]
 
             name = 'SECTION_TIMES'
             pointer = sec_times
@@ -429,10 +449,162 @@ class ChromatographyModel(abc.ABC):
         for k, v in self.unit_operations(unit_type=Outlet):
             v.pprint(indent=2)
 
-    def write_cadet_file(self,filename, tspan, active_sec, solver_kwargs, disct_kwargs):
-        print("TODO")
+    def write_to_cadet_input_file(self,
+                                  filename,
+                                  tspan,
+                                  disct_kwargs,
+                                  solver_kwargs,
+                                  **kwargs):
+
+        active_sec = kwargs.pop('active_set', 'default')
+        with_solver = kwargs.pop('with_solver', True)
+        concentrations = kwargs.pop('concentrations', 'in_out')
+        sensitivities = kwargs.pop('sensitivities', 'in_out')
+        sol_t = kwargs.pop('sol_times', 'all')
+
+
+        # check num columns
+        if self._num_columns == 0:
+            raise RuntimeError("At least one column is required in the model")
+
+        # check num sections
+        if self.num_sections == 0:
+            raise RuntimeError("At least one section is required in the model")
+
+        fully_specified = True
+        # check binding models
+        for n, e in self.binding_models():
+            fully_specified *= e.is_fully_specified(print_out=True)
+
+        # check sections
+        for n, e in self.sections():
+            fully_specified *= e.is_fully_specified(print_out=True)
+
+        # check unit operations
+        for n, e in self.unit_operations():
+            fully_specified *= e.is_fully_specified(print_out=True)
+
+        # check required entries in discretization
+        req_entries = ['ncol', 'npar']
+        for k in req_entries:
+            if k not in disct_kwargs.keys():
+                msg = "{} is required to write cadet file".format(k)
+                msg+= " Please provide {} in disct_kwargs".format(k)
+                raise RuntimeError(msg)
+            else:
+                if not isinstance(disct_kwargs[k], numbers.Integral):
+                    msg = "{} is not an integer".format(k)
+                    raise RuntimeError(msg)
+
+        if active_sec == 'default':
+            earliest_time = np.inf
+            active_sec = self._sections[0]
+            for n, s in self.sections():
+                if s.start_time_sec <= earliest_time:
+                    earliest_time = s.start_time_sec
+                    active_sec = s.name
+
+        # check if file already exists
+        if os.path.isfile(filename):
+            warnings.warn("Overwriting cadet input file")
+            os.remove(filename)
+
+        all_time_opts = ['WRITE_SOLUTION_TIMES',
+                         'WRITE_SOLUTION_LAST',
+                         'WRITE_SENS_LAST']
+
+        time_kwargs = dict()
+        for o in all_time_opts:
+            time_kwargs[o] = 0
+
+        if sol_t == 'all':
+            time_kwargs['WRITE_SOLUTION_TIMES'] = 1
+        elif sol_t == 'last':
+            time_kwargs['WRITE_SOLUTION_LAST'] = 1
+            time_kwargs['WRITE_SENS_LAST'] = 1
+        else:
+            msg = "solution times option not recognizes"
+            raise RuntimeError(msg)
+
+        with h5py.File(filename, 'w') as f:
+            inp = f.create_group("input")
+
+            ret = inp.create_group("return")
+
+            # write integers
+            for n, v in time_kwargs.items():
+                name = n.upper()
+                pointer = np.array(v, dtype='i')
+                ret.create_dataset(name,
+                                   data=pointer,
+                                   dtype='i')
+
+            model = inp.create_group("model")
+
+            reg_disc = Registrar.discretization_defaults
+
+            inkwargs = dict()
+            int_params = ['gs_type',
+                          'max_krylov',
+                          'max_restarts']
+
+            double_params = ['schur_safety']
+
+            for n in int_params+double_params:
+                inkwargs[n] = disct_kwargs.pop(n, reg_disc[n])
+
+            inkwargs['nunits'] = self.num_units
+
+            # check integer parameters
+            for n in int_params+['nunits']:
+                v = inkwargs[n]
+                name = n.upper()
+                pointer = np.array(v, dtype='i')
+                model.create_dataset(name,
+                                     data=pointer,
+                                     dtype='i')
+
+            # check integer parameters
+            for n in double_params:
+                v = inkwargs[n]
+                name = n.upper()
+                pointer = np.array(v, dtype='d')
+                model.create_dataset(name,
+                                     data=pointer,
+                                     dtype='d')
+
+
+
+        # write units
+        ncol = disct_kwargs.pop('ncol')
+        npar = disct_kwargs.pop('npar')
+        for n, u in self.unit_operations():
+            u.write_to_cadet_input_file(filename)
+            if isinstance(u, Column):
+                u.write_discretization_to_cadet_input_file(filename,
+                                                           ncol,
+                                                           npar,
+                                                           **disct_kwargs)
+                u.write_return_to_cadet_input_file(filename,
+                                                   concentrations=concentrations,
+                                                   sensitivities=sensitivities)
+
+        # write connections
+        self._write_connections_to_cadet_input_file(filename, active_sec)
+
+        # solver
+        if with_solver:
+            self._write_solver_info_to_cadet_input_file(filename,
+                                                        tspan,
+                                                        **solver_kwargs)
+
+
+
+
+
     def __setattr__(self, name, value):
         # TODO: add warning if overwriting name?
+
         if isinstance(value, BindingModel):
             value._model = weakref.ref(self)
             value.name = name
@@ -452,6 +624,10 @@ class ChromatographyModel(abc.ABC):
             value._unit_id = len(self._units)
             value._initialize_containers()
             self._units.append(name)
+            if isinstance(value, Column):
+                self._num_columns += 1
+
+
 
         super(ChromatographyModel, self).__setattr__(name, value)
 

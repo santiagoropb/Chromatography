@@ -34,7 +34,7 @@ class InletType(Enum):
 
 class UnitOperation(DataManager, abc.ABC):
 
-    def __init__(self, data=None, sections=None, **kwargs):
+    def __init__(self, components=None, data=None, sections=None, **kwargs):
 
         # Define type of unit operation
         self._unit_type = UnitOperationType.UNDEFINED
@@ -48,7 +48,7 @@ class UnitOperation(DataManager, abc.ABC):
             for s in sections:
                 self.add_section(s)
 
-        super().__init__(data=data, **kwargs)
+        super().__init__(components=components, data=data, **kwargs)
 
     @property
     def num_sections(self):
@@ -145,18 +145,26 @@ class UnitOperation(DataManager, abc.ABC):
 
     def _write_sections_to_cadet_input_file(self, filename):
 
-        unitname = str(self._unit_id).zfill(3)
+        unitname = 'unit_'+str(self._unit_id).zfill(3)
         for name in self._sections:
             sec = getattr(self._model(), name)
             sec.write_to_cadet_input_file(filename,unitname)
+
+    def pprint(self, indent=0):
+        t = '\t' * indent
+        print(t, self.name, ":\n")
+        if self.num_sections>0:
+            print(t, "sections: ", self.list_sections())
+        super().pprint(indent=indent)
 
 
 @UnitOperation.register
 class Inlet(UnitOperation):
 
-    def __init__(self, data=None, sections=None, **kwargs):
+    def __init__(self, components=None, data=None, sections=None, **kwargs):
 
-        super().__init__(data=data,
+        super().__init__(components=components,
+                         data=data,
                          sections=sections,
                          **kwargs)
 
@@ -187,8 +195,8 @@ class Inlet(UnitOperation):
             dtype = 'S{}'.format(len(s) + 1)
             pointer = np.array(s, dtype=dtype)
             inlet.create_dataset('UNIT_TYPE',
-                                  data=pointer,
-                                  dtype=dtype)
+                                 data=pointer,
+                                 dtype=dtype)
 
             s = str(self._inlet_type)
             dtype = 'S{}'.format(len(s) + 1)
@@ -201,18 +209,20 @@ class Inlet(UnitOperation):
             value = self.num_components
             pointer = np.array(value, dtype='i')
             inlet.create_dataset('NCOMP',
-                                  data=pointer,
-                                  dtype='i')
+                                 data=pointer,
+                                 dtype='i')
 
         self._write_sections_to_cadet_input_file(filename)
-
 
 @UnitOperation.register
 class Column(UnitOperation):
 
-    def __init__(self, data=None, sections=[], **kwargs):
+    def __init__(self, components=None, data=None, sections=None, **kwargs):
 
-        super().__init__(data=data, sections=sections, **kwargs)
+        super().__init__(components=components,
+                         data=data,
+                         sections=sections,
+                         **kwargs)
 
         self._registered_scalar_parameters = \
             Registrar.column_parameters['scalar']
@@ -377,21 +387,30 @@ class Column(UnitOperation):
     def set_par_diffusion(self, comp_name, value):
         self.set_index_parameter(comp_name, 'par_diffusion', value)
 
-    def is_fully_specified(self):
+    def is_fully_specified(self, print_out=False):
         self._check_model()
         df = self.get_index_parameters()
         has_nan = df.isnull().values.any()
         for k in self._registered_scalar_parameters:
             if k not in self.get_scalar_parameters(True).keys():
-                print("Missing scalar parameter {}".format(k))
+                if print_out:
+                    msg = "{} {} is not fully specified ".format(self.__class__.__name__, self.name)
+                    msg += "it is missing the scalar parameter {}".format(k)
+                    print(msg)
                 return False
             if k != 'binding':
                 if np.isnan(self._scalar_params[k]):
-                    print("Parameter {} is nan".format(k))
+                    if print_out:
+                        msg = "{} {} is not fully specified ".format(self.__class__.__name__, self.name)
+                        msg += "it is missing the scalar parameter {}".format(k)
+                        print(msg)
                     return False
             else:
                 if self._scalar_params[k] is None:
-                    print("Binding model needs to be specified".format(k))
+                    if print_out:
+                        msg = "{} {} is not fully specified ".format(self.__class__.__name__, self.name)
+                        msg += "it is missing the scalar parameter {}".format(k)
+                        print(msg)
                     return False
 
         return not has_nan
@@ -532,7 +551,7 @@ class Column(UnitOperation):
         int_params = ['use_analytic_jacobian',
                       'gs_type',
                       'max_krylov',
-                      'max_restart']
+                      'max_restarts']
 
         par_disc_type = kwargs.pop('par_disc_type', 'EQUIDISTANT_PAR')
 

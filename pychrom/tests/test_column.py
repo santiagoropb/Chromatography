@@ -47,29 +47,29 @@ class TestColumn(unittest.TestCase):
 
         # salt
         cid = 'salt'
-        comps[cid]['sma_kads'] = 0.0
-        comps[cid]['sma_kdes'] = 0.0
+        comps[cid]['sma_ka'] = 0.0
+        comps[cid]['sma_kd'] = 0.0
         comps[cid]['sma_nu'] = 0.0
         comps[cid]['sma_sigma'] = 0.0
 
         # lysozyme
         cid = 'lysozyme'
-        comps[cid]['sma_kads'] = 35.5
-        comps[cid]['sma_kdes'] = 1000.0
+        comps[cid]['sma_ka'] = 35.5
+        comps[cid]['sma_kd'] = 1000.0
         comps[cid]['sma_nu'] = 4.7
         comps[cid]['sma_sigma'] = 11.83
 
         # cytochrome
         cid = 'cytochrome'
-        comps[cid]['sma_kads'] = 1.59
-        comps[cid]['sma_kdes'] = 1000.0
+        comps[cid]['sma_ka'] = 1.59
+        comps[cid]['sma_kd'] = 1000.0
         comps[cid]['sma_nu'] = 5.29
         comps[cid]['sma_sigma'] = 10.6
 
         # ribonuclease
         cid = 'ribonuclease'
-        comps[cid]['sma_kads'] = 7.7
-        comps[cid]['sma_kdes'] = 1000.0
+        comps[cid]['sma_ka'] = 7.7
+        comps[cid]['sma_kd'] = 1000.0
         comps[cid]['sma_nu'] = 3.7
         comps[cid]['sma_sigma'] = 10.0
 
@@ -518,7 +518,7 @@ class TestColumn(unittest.TestCase):
         int_params = ['use_analytic_jacobian',
                       'gs_type',
                       'max_krylov',
-                      'max_restart']
+                      'max_restarts']
 
         int_weno = ['boundary_model',
                     'weno_order']

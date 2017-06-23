@@ -1,6 +1,7 @@
 from __future__ import print_function
 from pychrom.model.data_manager import DataManager
 from pychrom.model.registrar import Registrar
+from tabulate import tabulate
 import pandas as pd
 import numpy as np
 import warnings
@@ -95,6 +96,22 @@ class Section(DataManager):
             accum += df.get_value(comp_name, coeff)*c_var[comp_name]**j
         return accum
 
+    def f_str(self,comp_name):
+        df = self.get_index_parameters(with_defaults=True)
+        ordered_coeff = ['const_coeff', 'lin_coeff', 'quad_coeff', 'cube_coeff']
+        accum = ''
+        for j, coeff in enumerate(ordered_coeff):
+            if df.get_value(comp_name, coeff)>0.0:
+                aj = df.get_value(comp_name, coeff)
+                if j==0:
+                    accum += str(aj)
+                else:
+                    accum += ' +'+str(aj)+'t^{}'.format(j)
+        if accum=='':
+            accum='0.0'
+        return accum
+
+
     def _check_model(self):
         if self._model is None:
             msg = """Section not attached to a Chromatography model.
@@ -151,6 +168,28 @@ class Section(DataManager):
                 section.create_dataset(cadet_name,
                                        data=pointer,
                                        dtype='d')
+
+    def pprint(self, indent=0):
+        t = '\t' * indent
+        print(t, self.name, ":\n")
+
+        if self.num_scalar_parameters != 0:
+            print(t, "scalar parameters")
+            sp = self.get_scalar_parameters(with_defaults=True)
+            data = sorted([(k, v) for k, v in sp.items()])
+            headers = ['parameter', 'value']
+            print(tabulate(data, headers=headers, tablefmt="fancy_grid"))
+
+        comps = self.list_components()
+        data = [(k, self.f_str(k)) for k in comps]
+        headers = ['component', 'f(t)']
+        table =tabulate(data,
+                        headers=headers,
+                        tablefmt="fancy_grid",
+                        floatfmt=".1f")
+        print(table)
+
+        #super().pprint(indent=indent)
 
 
 

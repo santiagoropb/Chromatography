@@ -48,29 +48,29 @@ class TestBindingModel(unittest.TestCase):
 
         # salt
         cid = 'salt'
-        comps[cid]['sma_kads'] = 0.0
-        comps[cid]['sma_kdes'] = 0.0
+        comps[cid]['sma_ka'] = 0.0
+        comps[cid]['sma_kd'] = 0.0
         comps[cid]['sma_nu'] = 0.0
         comps[cid]['sma_sigma'] = 0.0
 
         # lysozyme
         cid = 'lysozyme'
-        comps[cid]['sma_kads'] = 35.5
-        comps[cid]['sma_kdes'] = 1000.0
+        comps[cid]['sma_ka'] = 35.5
+        comps[cid]['sma_kd'] = 1000.0
         comps[cid]['sma_nu'] = 4.7
         comps[cid]['sma_sigma'] = 11.83
 
         # cytochrome
         cid = 'cytochrome'
-        comps[cid]['sma_kads'] = 1.59
-        comps[cid]['sma_kdes'] = 1000.0
+        comps[cid]['sma_ka'] = 1.59
+        comps[cid]['sma_kd'] = 1000.0
         comps[cid]['sma_nu'] = 5.29
         comps[cid]['sma_sigma'] = 10.6
 
         # ribonuclease
         cid = 'ribonuclease'
-        comps[cid]['sma_kads'] = 7.7
-        comps[cid]['sma_kdes'] = 1000.0
+        comps[cid]['sma_ka'] = 7.7
+        comps[cid]['sma_kd'] = 1000.0
         comps[cid]['sma_nu'] = 3.7
         comps[cid]['sma_sigma'] = 10.0
 
@@ -139,10 +139,10 @@ class TestBindingModel(unittest.TestCase):
         GRM = self.m
         GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
-        bm.set_index_parameter('lysozyme', 'sma_kads', 777)
+        bm.set_index_parameter('lysozyme', 'sma_ka', 777)
         parsed = bm.get_index_parameters(with_defaults=False,
                                         form='dictionary')
-        self.test_data['index parameters']['lysozyme']['sma_kads'] = 777
+        self.test_data['index parameters']['lysozyme']['sma_ka'] = 777
         unparsed = self.test_data['index parameters']
         self.assertTrue(equal_dictionaries(parsed, unparsed))
 
@@ -192,29 +192,29 @@ class TestSMABindingModel(unittest.TestCase):
 
         # salt
         cid = 'salt'
-        comps[cid]['sma_kads'] = 0.0
-        comps[cid]['sma_kdes'] = 0.0
+        comps[cid]['sma_ka'] = 0.0
+        comps[cid]['sma_kd'] = 0.0
         comps[cid]['sma_nu'] = 0.0
         comps[cid]['sma_sigma'] = 0.0
 
         # lysozyme
         cid = 'lysozyme'
-        comps[cid]['sma_kads'] = 35.5
-        comps[cid]['sma_kdes'] = 1000.0
+        comps[cid]['sma_ka'] = 35.5
+        comps[cid]['sma_kd'] = 1000.0
         comps[cid]['sma_nu'] = 4.7
         comps[cid]['sma_sigma'] = 11.83
 
         # cytochrome
         cid = 'cytochrome'
-        comps[cid]['sma_kads'] = 1.59
-        comps[cid]['sma_kdes'] = 1000.0
+        comps[cid]['sma_ka'] = 1.59
+        comps[cid]['sma_kd'] = 1000.0
         comps[cid]['sma_nu'] = 5.29
         comps[cid]['sma_sigma'] = 10.6
 
         # ribonuclease
         cid = 'ribonuclease'
-        comps[cid]['sma_kads'] = 7.7
-        comps[cid]['sma_kdes'] = 1000.0
+        comps[cid]['sma_ka'] = 7.7
+        comps[cid]['sma_kd'] = 1000.0
         comps[cid]['sma_nu'] = 3.7
         comps[cid]['sma_sigma'] = 10.0
 
@@ -225,7 +225,7 @@ class TestSMABindingModel(unittest.TestCase):
         GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         cname = 'ribonuclease'
-        val = self.test_data['index parameters'][cname]['sma_kads']
+        val = self.test_data['index parameters'][cname]['sma_ka']
         self.assertEqual(bm.kads(cname), val)
 
     def test_kdes(self):
@@ -233,7 +233,7 @@ class TestSMABindingModel(unittest.TestCase):
         GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         cname = 'salt'
-        val = self.test_data['index parameters'][cname]['sma_kdes']
+        val = self.test_data['index parameters'][cname]['sma_kd']
         self.assertEqual(bm.kdes(cname), val)
 
     def test_nu(self):
@@ -296,10 +296,10 @@ class TestSMABindingModel(unittest.TestCase):
             else:
 
                 vi = self.test_data['index parameters'][cname]['sma_nu']
-                kads = self.test_data['index parameters'][cname]['sma_kads']
+                kads = self.test_data['index parameters'][cname]['sma_ka']
                 ads = kads * c_vars[cname] * (q0_bar) ** vi
 
-                kdes = self.test_data['index parameters'][cname]['sma_kdes']
+                kdes = self.test_data['index parameters'][cname]['sma_kd']
                 des = kdes * q_vars[cname] * (c_vars[GRM.salt]) ** vi
                 dqidt[cname] = ads - des
 
@@ -322,8 +322,8 @@ class TestSMABindingModel(unittest.TestCase):
         path = os.path.join("input", "model", unit, "adsorption")
         # read back and verify output
         with h5py.File(filename, 'r') as f:
-            params = {'sma_kads',
-                      'sma_kdes',
+            params = {'sma_ka',
+                      'sma_kd',
                       'sma_nu',
                       'sma_sigma'}
             # assumes salt is component 0

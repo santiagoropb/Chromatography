@@ -66,10 +66,11 @@ class BindingModel(DataManager, abc.ABC):
         """
 
     def pprint(self, indent=0):
+        t = '\t' * indent
+        print(t, self.name, ":\n")
+        print(t, "binding type:", self._binding_type)
         super().pprint(indent=indent)
-        t = '\t'*indent
-        print(t, "binding type:")
-        print(t, self._binding_type)
+
 
     #TODO: define if this is actually required
     #@abc.abstractmethod
@@ -175,13 +176,13 @@ class SMABinding(BindingModel):
                     q_0_bar -= (vj+sj)*q_vars[cname]
 
             # adsorption term
-            kads = _index_params.get_value(comp_name, 'sma_kads')
+            kads = _index_params.get_value(comp_name, 'sma_ka')
             vi = _index_params.get_value(comp_name, 'sma_nu')
             q_rf_salt = _scalar_params['sma_qref']
             adsorption = kads * c_vars[comp_name] * (q_0_bar / q_rf_salt) ** vi
 
             # desorption term
-            kdes = _index_params.get_value(comp_name, 'sma_kdes')
+            kdes = _index_params.get_value(comp_name, 'sma_kd')
             c_rf_salt = _scalar_params['sma_cref']
             desorption = kdes * q_vars[comp_name] * (c_vars[salt_name] / c_rf_salt) ** vi
 
@@ -218,8 +219,8 @@ class SMABinding(BindingModel):
                                       dtype='i')
 
             # adsorption ks
-            params = {'sma_kads',
-                      'sma_kdes',
+            params = {'sma_ka',
+                      'sma_kd',
                       'sma_nu',
                       'sma_sigma'}
 
@@ -248,16 +249,28 @@ class SMABinding(BindingModel):
             # TODO: sets are added
 
     def kads(self, comp_name):
-        return self.get_index_parameter(comp_name, 'sma_kads')
+        return self.get_index_parameter(comp_name, 'sma_ka')
 
     def kdes(self, comp_name):
-        return self.get_index_parameter(comp_name, 'sma_kdes')
+        return self.get_index_parameter(comp_name, 'sma_kd')
 
     def nu(self, comp_name):
         return self.get_index_parameter(comp_name, 'sma_nu')
 
     def sigma(self, comp_name):
         return self.get_index_parameter(comp_name, 'sma_sigma')
+
+    def set_kads(self, comp_name, value):
+        self.set_index_parameter(comp_name, 'sma_ka', value)
+
+    def set_kdes(self, comp_name, value):
+        self.set_index_parameter(comp_name, 'sma_kd', value)
+
+    def set_nu(self, comp_name, value):
+        self.set_index_parameter(comp_name, 'sma_nu', value)
+
+    def set_sigma(self, comp_name, value):
+        self.set_index_parameter(comp_name, 'sma_sigma', value)
 
     @property
     def lamda(self):

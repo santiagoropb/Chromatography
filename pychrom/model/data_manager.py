@@ -277,22 +277,37 @@ class DataManager(object):
         setattr(m, name, self)
         self._initialize_containers()
 
-    def is_fully_specified(self):
+    def is_fully_specified(self, print_out=False):
         self._check_model()
         df = self.get_index_parameters()
         has_nan = df.isnull().values.any()
         for k in self._registered_scalar_parameters:
             if k not in self.get_scalar_parameters(True).keys():
-                print("Missing scalar parameter {}".format(k))
+                if print_out:
+                    msg = "{} {} is not fully specified ".format(self.__class__.__name__, self.name)
+                    msg+= "it is missing the scalar parameter {}".format(k)
+                    print(msg)
                 return False
 
             if not isinstance(self._scalar_params[k], six.string_types):
                 if np.isnan(self._scalar_params[k]):
-                    print("Parameter {} is nan".format(k))
+                    if print_out:
+                        msg = "{} {} is not fully specified ".format(self.__class__.__name__, self.name)
+                        msg += "it is missing the scalar parameter {}".format(k)
+                        print(msg)
                     return False
             else:
                 if self._scalar_params[k] is None:
+                    if print_out:
+                        msg = "{} {} is not fully specified ".format(self.__class__.__name__, self.name)
+                        msg += "it is missing the scalar parameter {}".format(k)
+                        print(msg)
                     return False
+
+        if has_nan and print_out:
+            msg = "{} {} is not fully specified ".format(self.__class__.__name__, self.name)
+            msg += "it has index parameters unspecified"
+            print(msg)
 
         return not has_nan
 
@@ -331,7 +346,7 @@ class DataManager(object):
 
     def pprint(self, indent=0):
         t = '\t'*indent
-        print(t, self.name, ":")
+
         if self.num_scalar_parameters != 0:
             print(t, "scalar parameters")
             sp = self.get_scalar_parameters(with_defaults=True)

@@ -128,7 +128,7 @@ class TestChromatographyModel(unittest.TestCase):
 
         test_dir = tempfile.mkdtemp()
         filename = os.path.join(test_dir, "solver_tmp.hdf5")
-        m.write_solver_info_to_cadet_input_file(filename, user_times, **kwargs)
+        m._write_solver_info_to_cadet_input_file(filename, user_times, **kwargs)
 
         # read back and verify output
         with h5py.File(filename, 'r') as f:
@@ -160,10 +160,11 @@ class TestChromatographyModel(unittest.TestCase):
             for i, t in enumerate(read):
                 self.assertEqual(pointer[i], t)
 
-            sec_times = np.zeros(m.num_sections, dtype='d')
+            sec_times = np.zeros(m.num_sections+1, dtype='d')
             for n, sec in m.sections():
                 sec_id = sec._section_id
                 sec_times[sec_id] = sec.start_time_sec
+            sec_times[-1] = user_times[-1]
 
             name = 'SECTION_TIMES'
             dataset = os.path.join(path, "sections", name)
@@ -217,10 +218,10 @@ class TestChromatographyModel(unittest.TestCase):
         test_dir = tempfile.mkdtemp()
         filename = os.path.join(test_dir, "connections_tmp.hdf5")
 
-        m.write_connections_to_cadet_input_file(filename, 'load')
+        m._write_connections_to_cadet_input_file(filename, 'load')
         # read back and verify output
         with h5py.File(filename, 'r') as f:
-            path = os.path.join("input", "connections")
+            path = os.path.join("input", "model", "connections")
 
             # switches
             # TODO: verify how is this computed

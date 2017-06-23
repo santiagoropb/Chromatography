@@ -121,7 +121,7 @@ class Registrar(object):
     discretization_defaults = dict()
     discretization_defaults['gs_type'] = 1
     discretization_defaults['max_krylov'] = 0
-    discretization_defaults['max_restart'] = 10
+    discretization_defaults['max_restarts'] = 10
     discretization_defaults['schur_safety'] = 1e-8
     discretization_defaults['use_analytic_jacobian'] = 1
     discretization_defaults['par_disc_type'] = 'EQUIDISTANT_PAR'
@@ -168,8 +168,8 @@ class Registrar(object):
         default_scalar_parameters[p] = v
 
     # index parameters
-    adsorption_parameters['sma']['index'].add('sma_kads')
-    adsorption_parameters['sma']['index'].add('sma_kdes')
+    adsorption_parameters['sma']['index'].add('sma_ka')
+    adsorption_parameters['sma']['index'].add('sma_kd')
     adsorption_parameters['sma']['index'].add('sma_nu')
     adsorption_parameters['sma']['index'].add('sma_sigma')
 

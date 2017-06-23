@@ -59,6 +59,7 @@ def set_string(node, nameH5, value):
 
 def main():
     filename = "LWE.h5"
+    #filename = "first_model.h5"
     createSimulation(filename)
     runSimulation(filename)
     plotSimulation(filename)
