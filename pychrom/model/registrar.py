@@ -4,7 +4,7 @@ from __future__ import print_function
 class Registrar(object):
     
     """
-    Register all parameters that can be used in pycadet
+    Register all parameters that can be used in pychrom
     """
     
     # container with scalar parameters

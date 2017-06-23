@@ -1,8 +1,8 @@
-from pycadet.model.unit_operation import Column, UnitOperationType
-from pycadet.model.chromatograpy_model import GRModel
-from pycadet.model.binding_model import SMABinding
-from pycadet.model.registrar import Registrar
-from pycadet.utils.compare import equal_dictionaries, pprint_dict
+from pychrom.model.unit_operation import Column, UnitOperationType
+from pychrom.model.chromatograpy_model import GRModel
+from pychrom.model.binding_model import SMABinding
+from pychrom.model.registrar import Registrar
+from pychrom.utils.compare import equal_dictionaries, pprint_dict
 from collections import OrderedDict
 import numpy as np
 import unittest

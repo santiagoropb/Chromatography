@@ -1,6 +1,6 @@
-from pycadet.model.binding_model import SMABinding
-from pycadet.model.chromatograpy_model import GRModel
-from pycadet.utils.compare import equal_dictionaries
+from pychrom.model.binding_model import SMABinding
+from pychrom.model.chromatograpy_model import GRModel
+from pychrom.utils.compare import equal_dictionaries
 from collections import OrderedDict
 import unittest
 import tempfile

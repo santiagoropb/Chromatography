@@ -8,7 +8,7 @@ TODO
 Name
 ----
 
-Python Wrapper for Chromatography Analysis and Design Toolkit
+Python package for chromatography modeling and optimization
 
 TODO
 

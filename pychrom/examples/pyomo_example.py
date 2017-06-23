@@ -1,10 +1,10 @@
-from pycadet.model.chromatograpy_model import GRModel
-from pycadet.model.binding_model import SMABinding
+from pychrom.model.chromatograpy_model import GRModel
+from pychrom.model.binding_model import SMABinding
 import pyomo.environ as pe
 
 data_filename = "example.yml"
 
-# pycadet
+# pychrom
 cmodel = GRModel(data_filename)
 cmodel.binding = SMABinding()
 

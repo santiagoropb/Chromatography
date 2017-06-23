@@ -1,9 +1,9 @@
 from __future__ import print_function
-from pycadet.model.registrar import Registrar
-from pycadet.model.binding_model import BindingModel
-from pycadet.model.section import Section
-from pycadet.model.unit_operation import UnitOperation
-from pycadet.utils import parse_utils
+from pychrom.model.registrar import Registrar
+from pychrom.model.binding_model import BindingModel
+from pychrom.model.section import Section
+from pychrom.model.unit_operation import UnitOperation
+from pychrom.utils import parse_utils
 import numpy as np
 import warnings
 import logging

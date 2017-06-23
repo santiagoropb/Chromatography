@@ -1,6 +1,6 @@
-from pycadet.model.chromatograpy_model import GRModel
-from pycadet.model.section import Section
-from pycadet.model.unit_operation import Inlet, UnitOperationType, InletType
+from pychrom.model.chromatograpy_model import GRModel
+from pychrom.model.section import Section
+from pychrom.model.unit_operation import Inlet, UnitOperationType, InletType
 from collections import OrderedDict
 import numpy as np
 import unittest

@@ -1,7 +1,7 @@
 from __future__ import print_function
-from pycadet.utils import parse_utils
-from pycadet.utils import pandas_utils as pd_utils
-from pycadet.utils.compare import  pprint_dict
+from pychrom.utils import parse_utils
+from pychrom.utils import pandas_utils as pd_utils
+from pychrom.utils.compare import  pprint_dict
 import numpy as np
 import warnings
 import pandas as pd

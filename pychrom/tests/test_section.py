@@ -1,6 +1,6 @@
-from pycadet.model.chromatograpy_model import GRModel
-from pycadet.model.section import Section
-from pycadet.utils.compare import equal_dictionaries, pprint_dict
+from pychrom.model.chromatograpy_model import GRModel
+from pychrom.model.section import Section
+from pychrom.utils.compare import equal_dictionaries, pprint_dict
 from collections import OrderedDict
 import numpy as np
 import unittest

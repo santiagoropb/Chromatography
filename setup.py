@@ -1,11 +1,11 @@
 from setuptools import setup, find_packages
 
 
-DISTNAME = 'pycadet'
+DISTNAME = 'pychrom'
 VERSION = '0.0.0'
 PACKAGES = find_packages()
 EXTENSIONS = []
-DESCRIPTION = 'Python Wrapper for Chromatography Analysis and Design Toolkit'
+DESCRIPTION = 'Python package for chromatography modeling and optimization'
 LONG_DESCRIPTION = open('README.md').read()
 AUTHOR = 'DIPT/Jose-Santiago-Rodriguez '
 MAINTAINER_EMAIL = 'TODO'

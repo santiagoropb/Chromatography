@@ -1,6 +1,6 @@
 from __future__ import print_function
-from pycadet.model.data_manager import DataManager
-from pycadet.model.registrar import Registrar
+from pychrom.model.data_manager import DataManager
+from pychrom.model.registrar import Registrar
 import pandas as pd
 import numpy as np
 import warnings

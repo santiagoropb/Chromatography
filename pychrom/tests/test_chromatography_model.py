@@ -1,8 +1,8 @@
-from pycadet.model.chromatograpy_model import ChromatographyModel, GRModel
-from pycadet.model.unit_operation import Inlet, Column
-from pycadet.model.section import Section
-from pycadet.utils.compare import equal_dictionaries, pprint_dict
-from pycadet.model.registrar import Registrar
+from pychrom.model.chromatograpy_model import ChromatographyModel, GRModel
+from pychrom.model.unit_operation import Inlet, Column
+from pychrom.model.section import Section
+from pychrom.utils.compare import equal_dictionaries, pprint_dict
+from pychrom.model.registrar import Registrar
 from collections import OrderedDict
 import numpy as np
 import unittest
