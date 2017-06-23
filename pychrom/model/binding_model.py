@@ -65,6 +65,12 @@ class BindingModel(DataManager, abc.ABC):
         :return: expression if pyomo variable or scalar value
         """
 
+    def pprint(self, indent=0):
+        super().pprint(indent=indent)
+        t = '\t'*indent
+        print(t, "binding type:")
+        print(t, self._binding_type)
+
     #TODO: define if this is actually required
     #@abc.abstractmethod
     #def dqdt(self, comp_id, c_vars, q_vars, unfix_params=None, unfix_idx_param=None):

@@ -1,8 +1,8 @@
 from __future__ import print_function
+from pychrom.model.unit_operation import UnitOperation, Column, Inlet, Outlet
 from pychrom.model.registrar import Registrar
 from pychrom.model.binding_model import BindingModel
 from pychrom.model.section import Section
-from pychrom.model.unit_operation import UnitOperation
 from pychrom.utils import parse_utils
 import numpy as np
 import warnings
@@ -263,9 +263,18 @@ class ChromatographyModel(abc.ABC):
     def list_unit_operations(self):
         return [n for n in self._units]
 
-    def unit_operations(self):
-        for n in self._units:
-            yield n, getattr(self, n)
+    def unit_operations(self, unit_type=None):
+        if unit_type is None:
+            for n in self._units:
+                yield n, getattr(self, n)
+        else:
+            valid_types = [Column, Inlet, Outlet]
+            if unit_type not in valid_types:
+                raise RuntimeError("unitType not recognized")
+            for n in self._units:
+                u = getattr(self, n)
+                if isinstance(u, unit_type):
+                    yield n, u
 
     def write_connections_to_cadet_input_file(self, filename, active_sec):
 
@@ -395,6 +404,33 @@ class ChromatographyModel(abc.ABC):
         for i in connection:
             self._connections.append(i)
 
+    def pprint(self):
+
+        print("{} component declarations:".format(self.num_components))
+        for k, v in self._comp_name_to_id.items():
+            print('\t', v, k)
+
+        print("{} binding model declarations:".format(self.num_binding_models))
+        for k, v in self.binding_models():
+            v.pprint(indent=1)
+
+        print("{} section declarations:".format(self.num_sections))
+        for k, v in self.sections():
+            v.pprint(indent=1)
+
+        print("{} unit operation declarations:".format(self.num_units))
+        print("\n Inlets")
+        for k, v in self.unit_operations(unit_type=Inlet):
+            v.pprint(indent=2)
+        print("\n Columns")
+        for k, v in self.unit_operations(unit_type=Column):
+            v.pprint(indent=2)
+        print("\n Outlets")
+        for k, v in self.unit_operations(unit_type=Outlet):
+            v.pprint(indent=2)
+
+    def write_cadet_file(self,filename, tspan, active_sec, solver_kwargs, disct_kwargs):
+        print("TODO")
     def __setattr__(self, name, value):
         # TODO: add warning if overwriting name?
         if isinstance(value, BindingModel):
@@ -412,6 +448,7 @@ class ChromatographyModel(abc.ABC):
 
         if isinstance(value, UnitOperation):
             value._model = weakref.ref(self)
+            value.name = name
             value._unit_id = len(self._units)
             value._initialize_containers()
             self._units.append(name)

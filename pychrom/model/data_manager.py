@@ -1,7 +1,7 @@
 from __future__ import print_function
 from pychrom.utils import parse_utils
 from pychrom.utils import pandas_utils as pd_utils
-from pychrom.utils.compare import  pprint_dict
+from tabulate import tabulate
 import numpy as np
 import warnings
 import pandas as pd
@@ -329,11 +329,19 @@ class DataManager(object):
         else:
             return [self._model()._comp_id_to_name[k] for k in self._components]
 
-    def pprint(self):
-        print(self.num_scalar_parameters, "scalar parameters")
-        pprint_dict(self.get_scalar_parameters(with_defaults=True))
-        print(self.num_index_parameters, "index parameters")
-        print(self.get_index_parameters(with_defaults=True))
+    def pprint(self, indent=0):
+        t = '\t'*indent
+        print(t, self.name, ":")
+        if self.num_scalar_parameters != 0:
+            print(t, "scalar parameters")
+            sp = self.get_scalar_parameters(with_defaults=True)
+            data = sorted([(k, v) for k, v in sp.items()])
+            headers = ['parameter','value']
+            print(tabulate(data, headers=headers, tablefmt="fancy_grid"))
+        df = self.get_index_parameters(with_defaults=True)
+        if not df.empty:
+            print(t, "Index parameters")
+            print(tabulate(df, tablefmt="fancy_grid", headers=df.columns))
 
 
     def help(self):
