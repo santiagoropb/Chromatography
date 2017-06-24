@@ -15,5 +15,4 @@ before_install:
 install:
 - pip install -r requirements.txt
 script:
-- bash build_cadet/get.sundials.sh
 - nosetests pychrom/tests/ -v --with-coverage --cover-package=pychrom
