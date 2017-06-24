@@ -43,7 +43,7 @@ rm -rf $sundials.tar
 # building sundials
 mkdir build_sundials
 cd build_sundials
-cmake -DCMAKE_INSTALL_PREFIX=$PWD/cadet-install/Libs/sundials -DEXAMPLES_ENABLE=OFF -DOPENMP_ENABLE=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS=-fPIC ../$sundials
+cmake -DCMAKE_INSTALL_PREFIX=$PWD/cadet-install/Libs/sundials -DEXAMPLES_ENABLE=OFF -DOPENMP_ENABLE=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS=-fPIC -DNO_OMP=1 ../$sundials
 make
 make install
 cd ../..
