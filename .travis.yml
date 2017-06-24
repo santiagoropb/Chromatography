@@ -9,6 +9,7 @@ before_install:
 - test -n $CC  && unset CC
 - test -n $CXX && unset CXX
 - sudo apt-get install libhdf5-serial-dev hdf5-tools
+- sudo apt-get install libsundials-serial libsundials-serial-dev
 - sudo apt-get install liblapack-dev
 - sudo apt-get install cmake
 - sudo apt-get install git
