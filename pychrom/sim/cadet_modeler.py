@@ -30,5 +30,3 @@ class CadetModeler(object):
         :return:
         """
         print("TODO")
-
-    
