@@ -5,6 +5,11 @@ matrix:
   include:
     - os: linux
       sudo: False
+
+before_install:
+before_install:
+- test -n $CC  && unset CC
+- test -n $CXX && unset CXX
 install:
 - pip install -r requirements.txt
 script:
