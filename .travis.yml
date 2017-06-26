@@ -15,5 +15,6 @@ before_install:
 - sudo apt-get install git
 install:
 - pip install -r requirements.txt
+- python setup.py install
 script:
 - nosetests pychrom/tests/ -v --with-coverage --cover-package=pychrom
