@@ -1,5 +1,5 @@
-from pychrom.model.chromatograpy_model import GRModel
-from pychrom.model.binding_model import SMABinding
+from pychrom.core.chromatograpy_model import GRModel
+from pychrom.core.binding_model import SMABinding
 import pyomo.environ as pe
 
 data_filename = "example.yml"

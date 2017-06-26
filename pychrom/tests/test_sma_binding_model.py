@@ -1,5 +1,5 @@
-from pychrom.model.binding_model import SMABinding
-from pychrom.model.chromatograpy_model import GRModel
+from pychrom.core.binding_model import SMABinding
+from pychrom.core.chromatograpy_model import GRModel
 from pychrom.utils.compare import equal_dictionaries
 from collections import OrderedDict
 import unittest
@@ -23,7 +23,6 @@ class TestBindingModel(unittest.TestCase):
 
         cls.base_model_data['scalar parameters'] = dict()
         cls.m = GRModel(data=cls.base_model_data)
-
 
     def setUp(self):
 

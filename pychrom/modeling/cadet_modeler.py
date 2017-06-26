@@ -1,6 +1,6 @@
-from pychrom.model.chromatograpy_model import GRModel
-from pychrom.model.unit_operation import Column
-from pychrom.model.registrar import Registrar
+from pychrom.core.chromatograpy_model import GRModel
+from pychrom.core.unit_operation import Column
+from pychrom.core.registrar import Registrar
 import matplotlib.pyplot as plt
 import numpy as np
 import subprocess

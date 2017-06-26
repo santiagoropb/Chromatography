@@ -1,5 +1,5 @@
-from pychrom.model.chromatograpy_model import GRModel
-from pychrom.model.unit_operation import Outlet, UnitOperationType
+from pychrom.core.chromatograpy_model import GRModel
+from pychrom.core.unit_operation import Outlet, UnitOperationType
 from pychrom.utils.compare import equal_dictionaries, pprint_dict
 from collections import OrderedDict
 import numpy as np

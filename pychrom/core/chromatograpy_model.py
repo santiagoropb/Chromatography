@@ -1,8 +1,8 @@
 from __future__ import print_function
-from pychrom.model.unit_operation import UnitOperation, Column, Inlet, Outlet
-from pychrom.model.registrar import Registrar
-from pychrom.model.binding_model import BindingModel
-from pychrom.model.section import Section
+from pychrom.core.unit_operation import UnitOperation, Column, Inlet, Outlet
+from pychrom.core.registrar import Registrar
+from pychrom.core.binding_model import BindingModel
+from pychrom.core.section import Section
 from pychrom.utils import parse_utils
 import numpy as np
 import warnings

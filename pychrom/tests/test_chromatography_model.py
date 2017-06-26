@@ -1,9 +1,9 @@
-from pychrom.model.chromatograpy_model import ChromatographyModel, GRModel
-from pychrom.model.unit_operation import Inlet, Column, Outlet
-from pychrom.model.binding_model import SMABinding
-from pychrom.model.section import Section
+from pychrom.core.chromatograpy_model import ChromatographyModel, GRModel
+from pychrom.core.unit_operation import Inlet, Column, Outlet
+from pychrom.core.binding_model import SMABinding
+from pychrom.core.section import Section
 from pychrom.utils.compare import equal_dictionaries, pprint_dict
-from pychrom.model.registrar import Registrar
+from pychrom.core.registrar import Registrar
 import numpy as np
 import unittest
 import tempfile

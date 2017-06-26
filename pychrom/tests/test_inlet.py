@@ -1,6 +1,6 @@
-from pychrom.model.chromatograpy_model import GRModel
-from pychrom.model.section import Section
-from pychrom.model.unit_operation import Inlet, UnitOperationType, InletType
+from pychrom.core.chromatograpy_model import GRModel
+from pychrom.core.section import Section
+from pychrom.core.unit_operation import Inlet, UnitOperationType, InletType
 from collections import OrderedDict
 import numpy as np
 import unittest

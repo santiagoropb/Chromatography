@@ -1,8 +1,8 @@
-from pychrom.model.chromatograpy_model import GRModel
-from pychrom.model.section import Section
-from pychrom.model.unit_operation import Inlet, Column, Outlet
-from pychrom.model.binding_model import SMABinding
-from pychrom.sim.cadet_modeler import CadetModeler
+from pychrom.core.chromatograpy_model import GRModel
+from pychrom.core.section import Section
+from pychrom.core.unit_operation import Inlet, Column, Outlet
+from pychrom.core.binding_model import SMABinding
+from pychrom.modeling.cadet_modeler import CadetModeler
 import h5py
 
 comps = ['salt',
