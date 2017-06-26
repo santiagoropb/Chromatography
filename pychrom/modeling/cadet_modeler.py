@@ -116,7 +116,7 @@ class CadetModeler(object):
         for n in params:
             disct_kwargs[n] = kwargs.pop(n, reg_disc[n])
 
-        self._model.write_to_cadet_input_file(filename,
+        self._model._write_to_cadet_input_file(filename,
                                               tspan,
                                               disct_kwargs,
                                               kwargs,
@@ -132,7 +132,7 @@ class CadetModeler(object):
             for k,v in self._discretizations.items():
                 if k not in ['npar', 'ncol']:
                     disct_dict[k] = v
-            u.write_discretization_to_cadet_input_file(filename,
+            u._write_discretization_to_cadet_input_file(filename,
                                                        ncol,
                                                        npar,
                                                        **disct_dict)

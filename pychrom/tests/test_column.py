@@ -345,7 +345,7 @@ class TestColumn(unittest.TestCase):
 
         filename = os.path.join(test_dir, "col_tmp.hdf5")
 
-        col.write_to_cadet_input_file(filename)
+        col._write_to_cadet_input_file(filename)
 
         # read back and verify output
         with h5py.File(filename, 'r') as f:
@@ -435,7 +435,7 @@ class TestColumn(unittest.TestCase):
                         'WRITE_SENSDOT_FLUX']
 
         filename = os.path.join(test_dir, "col_return_tmp1.hdf5")
-        col.write_return_to_cadet_input_file(filename)
+        col._write_return_to_cadet_input_file(filename)
 
         # test with defaults
         # read back and verify output
@@ -467,7 +467,7 @@ class TestColumn(unittest.TestCase):
 
         # test with defaults
         filename = os.path.join(test_dir, "col_return_tmp2.hdf5")
-        col.write_return_to_cadet_input_file(filename,
+        col._write_return_to_cadet_input_file(filename,
                                              concentrations='all',
                                              sensitivities='all')
 
@@ -537,7 +537,7 @@ class TestColumn(unittest.TestCase):
 
         ncol = 50
         npar = 10
-        col.write_discretization_to_cadet_input_file(filename,
+        col._write_discretization_to_cadet_input_file(filename,
                                                      ncol,
                                                      npar,
                                                      **kwargs)

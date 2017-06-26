@@ -66,7 +66,7 @@ class TestInlet(unittest.TestCase):
         test_dir = tempfile.mkdtemp()
         filename = os.path.join(test_dir, "inlet_tmp.hdf5")
 
-        inlet.write_to_cadet_input_file(filename)
+        inlet._write_to_cadet_input_file(filename)
 
         # read back and verify output
         with h5py.File(filename, 'r') as f:

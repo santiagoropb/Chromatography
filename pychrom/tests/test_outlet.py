@@ -40,7 +40,7 @@ class Testoutlet(unittest.TestCase):
         test_dir = tempfile.mkdtemp()
         filename = os.path.join(test_dir, "outlet_tmp.hdf5")
 
-        outlet.write_to_cadet_input_file(filename)
+        outlet._write_to_cadet_input_file(filename)
 
         # read back and verify output
         with h5py.File(filename, 'r') as f:

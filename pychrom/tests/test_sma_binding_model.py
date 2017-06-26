@@ -316,7 +316,7 @@ class TestSMABindingModel(unittest.TestCase):
 
         filename = os.path.join(test_dir, "sma_tmp.hdf5")
         unit = 'unit_001'
-        m.write_to_cadet_input_file(filename, unit)
+        m._write_to_cadet_input_file(filename, unit)
 
         path = os.path.join("input", "model", unit, "adsorption")
         # read back and verify output

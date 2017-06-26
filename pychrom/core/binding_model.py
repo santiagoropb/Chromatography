@@ -48,7 +48,7 @@ class BindingModel(DataManager, abc.ABC):
         return self._binding_type
 
     @abc.abstractmethod
-    def write_to_cadet_input_file(self, filename, unitname, **kwargs):
+    def _write_to_cadet_input_file(self, filename, unitname, **kwargs):
         """
         Append binding model to cadet hdf5 input file
         :param filename: name of cadet hdf5 input file
@@ -188,7 +188,7 @@ class SMABinding(BindingModel):
 
             return adsorption-desorption
 
-    def write_to_cadet_input_file(self, filename, unitname, **kwargs):
+    def _write_to_cadet_input_file(self, filename, unitname, **kwargs):
 
         self._check_model()
 

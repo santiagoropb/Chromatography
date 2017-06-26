@@ -374,7 +374,7 @@ class TestChromatographyModel(unittest.TestCase):
         test_dir = tempfile.mkdtemp()
         filename = os.path.join(test_dir, "first_model.h5")
 
-        GRM.write_to_cadet_input_file(filename,
+        GRM._write_to_cadet_input_file(filename,
                                       tspan,
                                       disct_kwargs,
                                       dict())

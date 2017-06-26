@@ -74,7 +74,7 @@ class UnitOperation(DataManager, abc.ABC):
             raise RuntimeError(msg)
 
     @abc.abstractmethod
-    def write_to_cadet_input_file(self, filename, **kwargs):
+    def _write_to_cadet_input_file(self, filename, **kwargs):
         """
         Append UnitOperation to cadet hdf5 input file
         :param filename: name of cadet hdf5 input file
@@ -148,7 +148,7 @@ class UnitOperation(DataManager, abc.ABC):
         unitname = 'unit_'+str(self._unit_id).zfill(3)
         for name in self._sections:
             sec = getattr(self._model(), name)
-            sec.write_to_cadet_input_file(filename,unitname)
+            sec._write_to_cadet_input_file(filename,unitname)
 
     def pprint(self, indent=0):
         t = '\t' * indent
@@ -174,7 +174,7 @@ class Inlet(UnitOperation):
         # Define type inlet
         self._inlet_type = InletType.PIECEWISE_CUBIC_POLY
 
-    def write_to_cadet_input_file(self, filename, **kwargs):
+    def _write_to_cadet_input_file(self, filename, **kwargs):
         """
         Append inlet to cadet hdf5 input file
         :param filename: name of cadet hdf5 input file
@@ -447,7 +447,7 @@ class Column(UnitOperation):
         self._fill_containers()
         self._inputs = None
 
-    def write_to_cadet_input_file(self, filename, **kwargs):
+    def _write_to_cadet_input_file(self, filename, **kwargs):
         """
         Append UnitOperation to cadet hdf5 input file
         :param filename: name of cadet hdf5 input file
@@ -531,12 +531,12 @@ class Column(UnitOperation):
                                       dtype='d')
 
         # writes binding model
-        self.binding_model.write_to_cadet_input_file(filename, unitname)
+        self.binding_model._write_to_cadet_input_file(filename, unitname)
 
         # writes sections
         self._write_sections_to_cadet_input_file(filename)
 
-    def write_discretization_to_cadet_input_file(self, filename, ncol, npar,**kwargs):
+    def _write_discretization_to_cadet_input_file(self, filename, ncol, npar,**kwargs):
 
         self._check_model()
 
@@ -627,7 +627,7 @@ class Column(UnitOperation):
                                 data=pointer,
                                 dtype='d')
 
-    def write_return_to_cadet_input_file(self,
+    def _write_return_to_cadet_input_file(self,
                                          filename,
                                          concentrations='in_out',
                                          sensitivities='in_out'):
@@ -718,7 +718,7 @@ class Outlet(UnitOperation):
         # Define type of unit operation
         self._unit_type = UnitOperationType.OUTLET
 
-    def write_to_cadet_input_file(self, filename, **kwargs):
+    def _write_to_cadet_input_file(self, filename, **kwargs):
         """
         Append UnitOperation to cadet hdf5 input file
         :param filename: name of cadet hdf5 input file

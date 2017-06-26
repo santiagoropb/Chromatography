@@ -233,7 +233,7 @@ class TestSection(unittest.TestCase):
         filename = os.path.join(test_dir, "col_tmp.hdf5")
 
         unitname = 'unit_000'
-        sec.write_to_cadet_input_file(filename, unitname)
+        sec._write_to_cadet_input_file(filename, unitname)
 
         section_name = 'sec_'+str(sec._section_id).zfill(3)
         # read back and verify output

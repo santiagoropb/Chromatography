@@ -123,7 +123,7 @@ class Section(DataManager):
     def get_index_parameters(self, with_defaults=True, ids=False, form='dataframe'):
         return super().get_index_parameters(with_defaults=with_defaults, ids=ids, form=form)
 
-    def write_to_cadet_input_file(self, filename, unitname, **kwargs):
+    def _write_to_cadet_input_file(self, filename, unitname, **kwargs):
         """
         Write section to hdf5 file
         :param filename:

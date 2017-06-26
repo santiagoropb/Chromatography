@@ -61,7 +61,7 @@ disct_kwargs['npar'] = 10
 
 tspan = range(1500)
 filename = "first_model.h5"
-GRM.write_to_cadet_input_file(filename,
+GRM._write_to_cadet_input_file(filename,
                               tspan,
                               disct_kwargs,
                               dict())

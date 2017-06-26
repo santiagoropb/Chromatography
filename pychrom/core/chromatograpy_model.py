@@ -459,7 +459,7 @@ class ChromatographyModel(abc.ABC):
         for k, v in self.unit_operations(unit_type=Outlet):
             v.pprint(indent=2)
 
-    def write_to_cadet_input_file(self,
+    def _write_to_cadet_input_file(self,
                                   filename,
                                   tspan,
                                   disct_kwargs,
@@ -598,14 +598,14 @@ class ChromatographyModel(abc.ABC):
             npar = disct_kwargs.pop('npar')
 
         for n, u in self.unit_operations():
-            u.write_to_cadet_input_file(filename)
+            u._write_to_cadet_input_file(filename)
             if isinstance(u, Column):
                 if with_discretization:
-                    u.write_discretization_to_cadet_input_file(filename,
+                    u._write_discretization_to_cadet_input_file(filename,
                                                                ncol,
                                                                npar,
                                                                **disct_kwargs)
-                u.write_return_to_cadet_input_file(filename,
+                u._write_return_to_cadet_input_file(filename,
                                                    concentrations=concentrations,
                                                    sensitivities=sensitivities)
 
