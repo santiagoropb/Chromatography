@@ -250,9 +250,6 @@ class Column(UnitOperation):
         # binding model
         self._binding = None
 
-        # discretized flag
-        self._discretized = False
-
 
     @property
     def dispersion(self):
@@ -629,8 +626,6 @@ class Column(UnitOperation):
             weno.create_dataset(name,
                                 data=pointer,
                                 dtype='d')
-
-        self._discretized = True
 
     def write_return_to_cadet_input_file(self,
                                          filename,

@@ -265,8 +265,19 @@ class ChromatographyModel(abc.ABC):
         for n in self._sections:
             yield n, getattr(self, n)
 
-    def list_unit_operations(self):
-        return [n for n in self._units]
+    def list_unit_operations(self, unit_type=None):
+
+        if unit_type is None:
+            return [n for n in self._units]
+        units = list()
+        valid_types = [Column, Inlet, Outlet]
+        if unit_type not in valid_types:
+            raise RuntimeError("unitType not recognized")
+        for n in self._units:
+            u = getattr(self, n)
+            if isinstance(u, unit_type):
+                units.append(n)
+        return units
 
     def unit_operations(self, unit_type=None):
         if unit_type is None:
@@ -313,7 +324,6 @@ class ChromatographyModel(abc.ABC):
 
             name = 'CONNECTIONS'
             pointer = np.array(self._connections, dtype='i')
-            print(pointer)
             switch.create_dataset(name,
                                   data=pointer,
                                   dtype='i')
@@ -456,10 +466,15 @@ class ChromatographyModel(abc.ABC):
                                   solver_kwargs,
                                   **kwargs):
 
+        # TODO: extend to allow different discretizations for different columns
+        # TODO: set unit_ids of sections based on start times!
+        # TODO: make all the write_to cadet in core private functions _
+
         active_sec = kwargs.pop('active_set', 'default')
         with_solver = kwargs.pop('with_solver', True)
-        concentrations = kwargs.pop('concentrations', 'in_out')
-        sensitivities = kwargs.pop('sensitivities', 'in_out')
+        with_discretization = kwargs.pop('with_discretization', True)
+        concentrations = kwargs.pop('retrive_c', 'in_out')
+        sensitivities = kwargs.pop('retrive_sens', 'in_out')
         sol_t = kwargs.pop('sol_times', 'all')
 
 
@@ -484,17 +499,18 @@ class ChromatographyModel(abc.ABC):
         for n, e in self.unit_operations():
             fully_specified *= e.is_fully_specified(print_out=True)
 
-        # check required entries in discretization
-        req_entries = ['ncol', 'npar']
-        for k in req_entries:
-            if k not in disct_kwargs.keys():
-                msg = "{} is required to write cadet file".format(k)
-                msg+= " Please provide {} in disct_kwargs".format(k)
-                raise RuntimeError(msg)
-            else:
-                if not isinstance(disct_kwargs[k], numbers.Integral):
-                    msg = "{} is not an integer".format(k)
+        if with_discretization:
+            # check required entries in discretization
+            req_entries = ['ncol', 'npar']
+            for k in req_entries:
+                if k not in disct_kwargs.keys():
+                    msg = "{} is required to write cadet file".format(k)
+                    msg+= " Please provide {} in disct_kwargs".format(k)
                     raise RuntimeError(msg)
+                else:
+                    if not isinstance(disct_kwargs[k], numbers.Integral):
+                        msg = "{} is not an integer".format(k)
+                        raise RuntimeError(msg)
 
         if active_sec == 'default':
             earliest_time = np.inf
@@ -574,17 +590,21 @@ class ChromatographyModel(abc.ABC):
                                      dtype='d')
 
 
-
         # write units
-        ncol = disct_kwargs.pop('ncol')
-        npar = disct_kwargs.pop('npar')
+        ncol = 50
+        npar = 10
+        if with_discretization:
+            ncol = disct_kwargs.pop('ncol')
+            npar = disct_kwargs.pop('npar')
+
         for n, u in self.unit_operations():
             u.write_to_cadet_input_file(filename)
             if isinstance(u, Column):
-                u.write_discretization_to_cadet_input_file(filename,
-                                                           ncol,
-                                                           npar,
-                                                           **disct_kwargs)
+                if with_discretization:
+                    u.write_discretization_to_cadet_input_file(filename,
+                                                               ncol,
+                                                               npar,
+                                                               **disct_kwargs)
                 u.write_return_to_cadet_input_file(filename,
                                                    concentrations=concentrations,
                                                    sensitivities=sensitivities)
@@ -597,10 +617,6 @@ class ChromatographyModel(abc.ABC):
             self._write_solver_info_to_cadet_input_file(filename,
                                                         tspan,
                                                         **solver_kwargs)
-
-
-
-
 
     def __setattr__(self, name, value):
         # TODO: add warning if overwriting name?
