@@ -3,6 +3,7 @@ from pychrom.core.section import Section
 from pychrom.core.unit_operation import Inlet, Column, Outlet
 from pychrom.core.binding_model import SMABinding
 from pychrom.modeling.cadet_modeler import CadetModeler
+import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import h5py
 
@@ -76,6 +77,7 @@ if retrive_c == 'in_out':
 
 else:
 
+    """
     time = results.C.coords['time']
     components = results.C.coords['component']
     for l in [0.0, 0.014]:
@@ -88,4 +90,28 @@ else:
                 #    traj = results.C.sel(time=time, location=0.014, component=cname)
 
         plt.show()
-    
+    """
+
+    fig = plt.figure()
+    ax1 = fig.add_subplot(1, 1, 1)
+    textos = []
+
+    def animate(l):
+        time = results.C.coords['time']
+        components = results.C.coords['component']
+        loc = results.C.coords['location'][l]
+        print(loc)
+        ax1.clear()
+        for cname in components:
+            if cname != 'salt':
+                traj = results.C.sel(time=time, location=loc, component=cname)
+                ax1.plot(time, traj)
+        texto = fig.text(0, 0, 'Location {:.3}'.format(float(loc)))
+        textos.append(texto)
+        if l>1:
+            textos[l-1].remove()
+
+    n_locations = len(results.C.coords['location'])
+    ani = animation.FuncAnimation(fig, animate, interval=n_locations)
+    plt.show()
+
