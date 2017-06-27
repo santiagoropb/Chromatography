@@ -3,6 +3,7 @@ from pychrom.core.section import Section
 from pychrom.core.unit_operation import Inlet, Column, Outlet
 from pychrom.core.binding_model import SMABinding
 from pychrom.modeling.cadet_modeler import CadetModeler
+import matplotlib.pyplot as plt
 import h5py
 
 comps = ['salt',
@@ -44,10 +45,47 @@ GRM.connect_unit_operations('column', 'outlet')
 
 # create a modeler
 modeler = CadetModeler(GRM)
-modeler.discretize_column('column', 50, 10)
+ncol=50
+npar=10
+modeler.discretize_column('column', ncol, npar)
 
 # running a simulation
 tspan = range(1500)
-modeler.run_sim(tspan)
+
+retrive_c = 'all'
+
+results = modeler.run_sim(tspan,
+                          retrive_c=retrive_c,
+                          keep_files=False)
+
+if retrive_c == 'in_out':
+
+    time = results.C.coords['time']
+    components = results.C.coords['component']
+    for l in [0.0, 0.014]:
+        for cname in components:
+            if cname != 'salt':
+                traj = results.C.sel(time=time, location=l, component=cname)
+                plt.plot(time, traj)
+
+            #else:
+            #    traj = results.C.sel(time=time, location=0.014, component=cname)
 
 
+        plt.show()
+
+else:
+
+    time = results.C.coords['time']
+    components = results.C.coords['component']
+    for l in [0.0, 0.014]:
+        for cname in components:
+            if cname != 'salt':
+                traj = results.C.sel(time=time, location=l, component=cname)
+                plt.plot(time, traj)
+
+                # else:
+                #    traj = results.C.sel(time=time, location=0.014, component=cname)
+
+        plt.show()
+    

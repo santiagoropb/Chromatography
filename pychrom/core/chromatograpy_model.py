@@ -527,7 +527,8 @@ class ChromatographyModel(abc.ABC):
 
         all_time_opts = ['WRITE_SOLUTION_TIMES',
                          'WRITE_SOLUTION_LAST',
-                         'WRITE_SENS_LAST']
+                         'WRITE_SENS_LAST',
+                         'SPLIT_COMPONENTS_DATA']
 
         time_kwargs = dict()
         for o in all_time_opts:
