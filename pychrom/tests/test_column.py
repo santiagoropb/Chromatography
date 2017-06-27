@@ -15,23 +15,23 @@ import os
 
 class TestColumn(unittest.TestCase):
 
-    @classmethod
-    def setUpClass(cls):
-        cls.base_model_data = dict()
-        cls.base_model_data['components'] = ['salt',
+    def setUp(self):
+
+        self.base_model_data = dict()
+        self.base_model_data['components'] = ['salt',
                                              'lysozyme',
                                              'cytochrome',
                                              'ribonuclease']
 
-        cls.base_model_data['scalar parameters'] = dict()
-        cls.m = GRModel(data=cls.base_model_data)
+        self.base_model_data['scalar parameters'] = dict()
+        self.m = GRModel(data=self.base_model_data)
 
-        cls.sma_data = dict()
-        cls.sma_data['index parameters'] = OrderedDict()
-        cls.sma_data['scalar parameters'] = dict()
+        self.sma_data = dict()
+        self.sma_data['index parameters'] = OrderedDict()
+        self.sma_data['scalar parameters'] = dict()
 
-        comps = cls.sma_data['index parameters']
-        sparams = cls.sma_data['scalar parameters']
+        comps = self.sma_data['index parameters']
+        sparams = self.sma_data['scalar parameters']
 
         # set scalar params
         sparams['sma_lambda'] = 1200
@@ -73,16 +73,8 @@ class TestColumn(unittest.TestCase):
         comps[cid]['sma_nu'] = 3.7
         comps[cid]['sma_sigma'] = 10.0
 
-        GRM = cls.m
-        GRM.binding = SMABinding(data=cls.sma_data)
-
-    def test_unit_type(self):
         GRM = self.m
-        GRM.column = Column(data=self.test_data)
-        col = GRM.column
-        self.assertEqual(col._unit_type, UnitOperationType.COLUMN)
-
-    def setUp(self):
+        GRM.binding = SMABinding(data=self.sma_data)
 
         self.test_data = dict()
         self.test_data['index parameters'] = OrderedDict()
@@ -137,6 +129,13 @@ class TestColumn(unittest.TestCase):
         comps[cid]['film_diffusion'] = 6.9e-6
         comps[cid]['par_diffusion'] = 6.07e-11
         comps[cid]['par_surfdiffusion'] = 0.0
+
+    def test_unit_type(self):
+        GRM = self.m
+        GRM.column = Column(data=self.test_data)
+        col = GRM.column
+        self.assertEqual(col._unit_type, UnitOperationType.COLUMN)
+
 
     """
     def test_is_fully_specified(self):

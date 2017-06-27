@@ -89,7 +89,6 @@ class TestInlet(unittest.TestCase):
             for name, v in strings.items():
                 dataset = os.path.join(path, name)
                 # check unit type
-                print(dataset)
                 read = f[dataset].value
                 self.assertEqual(read, v)
 

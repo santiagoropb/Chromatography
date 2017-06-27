@@ -12,19 +12,16 @@ import os
 
 class TestBindingModel(unittest.TestCase):
 
-    @classmethod
-    def setUpClass(cls):
-
-        cls.base_model_data = dict()
-        cls.base_model_data['components'] = ['salt',
-                                              'lysozyme',
-                                              'cytochrome',
-                                              'ribonuclease']
-
-        cls.base_model_data['scalar parameters'] = dict()
-        cls.m = GRModel(data=cls.base_model_data)
-
     def setUp(self):
+
+        self.base_model_data = dict()
+        self.base_model_data['components'] = ['salt',
+                                             'lysozyme',
+                                             'cytochrome',
+                                             'ribonuclease']
+
+        self.base_model_data['scalar parameters'] = dict()
+        self.m = GRModel(data=self.base_model_data)
 
         self.test_data = dict()
         self.test_data['index parameters'] = OrderedDict()
@@ -254,7 +251,6 @@ class TestSMABindingModel(unittest.TestCase):
     def test_f_ads(self):
 
         GRM = self.m
-        print(self.m.list_components())
         GRM.binding = SMABinding(data=self.test_data)
         m = GRM.binding
 

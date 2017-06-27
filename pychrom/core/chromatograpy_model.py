@@ -477,7 +477,6 @@ class ChromatographyModel(abc.ABC):
         sensitivities = kwargs.pop('retrive_sens', 'in_out')
         sol_t = kwargs.pop('sol_times', 'all')
 
-
         # check num columns
         if self._num_columns == 0:
             raise RuntimeError("At least one column is required in the model")
@@ -498,6 +497,18 @@ class ChromatographyModel(abc.ABC):
         # check unit operations
         for n, e in self.unit_operations():
             fully_specified *= e.is_fully_specified(print_out=True)
+
+        # before anything is written make reset sections ids based on time
+        sec_times = []
+        for n, sec in self.sections():
+            sec_times.append(sec.start_time_sec)
+
+        # sort the section ids according to time
+        sorted_times = sorted(sec_times)
+        for n, sec in self.sections():
+            t = sec.start_time_sec
+            new_id = sorted_times.index(t)
+            sec._section_id = new_id
 
         if with_discretization:
             # check required entries in discretization
@@ -620,7 +631,22 @@ class ChromatographyModel(abc.ABC):
                                                         **solver_kwargs)
 
     def __setattr__(self, name, value):
-        # TODO: add warning if overwriting name?
+
+        if name in self.__dict__.keys():
+            msg = 'Overwriting of {} not allowed '.format(name)
+            msg += 'The attribute has already already created '
+
+            if name in self.list_binding_models():
+                msg += 'as a binding model'
+                raise RuntimeError(msg)
+
+            if name in self.list_unit_operations():
+                msg += 'as a unit operation'
+                raise RuntimeError(msg)
+
+            if name in self.list_sections():
+                msg += 'as a section'
+                raise RuntimeError(msg)
 
         if isinstance(value, BindingModel):
             value._model = weakref.ref(self)

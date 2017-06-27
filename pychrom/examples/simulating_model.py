@@ -5,7 +5,6 @@ from pychrom.core.binding_model import SMABinding
 from pychrom.modeling.cadet_modeler import CadetModeler
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
-import h5py
 
 comps = ['salt',
          'lysozyme',
@@ -13,10 +12,9 @@ comps = ['salt',
          'ribonuclease']
 
 GRM = GRModel(components=comps)
-GRM.salt = 'salt'
 
+# create sections
 GRM.load = Section(components=comps)
-
 for cname in comps:
     GRM.load.set_a0(cname, 1.0)
 GRM.load.set_a0('salt', 50.0)
@@ -31,13 +29,20 @@ GRM.elute.set_a0('salt', 100.0)
 GRM.elute.set_a1('salt', 0.2)
 GRM.elute.start_time_sec = 90.0
 
-
+# create inlet
 GRM.inlet = Inlet(components=comps)
 GRM.inlet.add_section('load')
 GRM.inlet.add_section('wash')
 GRM.inlet.add_section('elute')
+
+# create binding
+GRM.salt = 'salt'
 GRM.binding = SMABinding(data="sma.yml")
+
+# create column
 GRM.column = Column(data="column.yml")
+
+# create outlet
 GRM.outlet = Outlet(components=comps)
 
 # connect units
@@ -52,9 +57,7 @@ modeler.discretize_column('column', ncol, npar)
 
 # running a simulation
 tspan = range(1500)
-
 retrive_c = 'all'
-
 results = modeler.run_sim(tspan,
                           retrive_c=retrive_c,
                           keep_files=False)
@@ -68,29 +71,9 @@ if retrive_c == 'in_out':
             if cname != 'salt':
                 traj = results.C.sel(time=time, location=l, component=cname)
                 plt.plot(time, traj)
-
-            #else:
-            #    traj = results.C.sel(time=time, location=0.014, component=cname)
-
-
         plt.show()
 
 else:
-
-    """
-    time = results.C.coords['time']
-    components = results.C.coords['component']
-    for l in [0.0, 0.014]:
-        for cname in components:
-            if cname != 'salt':
-                traj = results.C.sel(time=time, location=l, component=cname)
-                plt.plot(time, traj)
-
-                # else:
-                #    traj = results.C.sel(time=time, location=0.014, component=cname)
-
-        plt.show()
-    """
 
     fig = plt.figure()
     ax1 = fig.add_subplot(1, 1, 1)
