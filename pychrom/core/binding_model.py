@@ -54,6 +54,29 @@ class BindingModel(DataManager, abc.ABC):
         :param filename: name of cadet hdf5 input file
         """
 
+        self._check_model()
+
+        if not self.is_fully_specified():
+            print(self.get_index_parameters())
+            raise RuntimeError("Missing parameters")
+
+        with h5py.File(filename, 'a') as f:
+            subgroup_name = os.path.join("input", "model", unitname)
+
+            if subgroup_name not in f:
+                f.create_group(subgroup_name)
+            subgroup = f[subgroup_name]
+            if 'adsorption' in subgroup:
+                warnings.warn("Overwriting {}/{}".format(subgroup_name, 'adsorption'))
+                adsorption = subgroup['adsorption']
+            else:
+                adsorption = subgroup.create_group('adsorption')
+
+            pointer = np.array(self.is_kinetic, dtype='i')
+            adsorption.create_dataset('IS_KINETIC',
+                                      data=pointer,
+                                      dtype='i')
+
     @abc.abstractmethod
     def f_ads(self, comp_name, c_vars, q_vars, **kwargs):
         """
@@ -95,6 +118,7 @@ class BindingModel(DataManager, abc.ABC):
     #    :param unfix_params: dictionary from parameter name to variable. Either value or pyomo variable
     #    :return: expression if pyomo variable or scalar value
     #    """
+
 
 
 @BindingModel.register
@@ -149,8 +173,8 @@ class SMABinding(BindingModel):
             print(self.get_index_parameters())
             raise RuntimeError("Missing parameters")
 
-        _index_params = self.get_index_parameters()
         _scalar_params = self.get_scalar_parameters(with_defaults=True)
+        #print(_scalar_params)
 
         assert self._model().salt is not None, "Salt must be defined in chromatography model"
 
@@ -160,93 +184,55 @@ class SMABinding(BindingModel):
         is_salt = self._model().is_salt(comp_name)
         salt_name = self._model().salt
 
+        loop_nosalt = [n for n in components if n != salt_name]
+        q_0 = _scalar_params['sma_lambda']
+        for cname in loop_nosalt:
+            vj = self.nu(cname)
+            q_0 -= vj * q_vars[cname]
+
         if is_salt:
-            q_0 = _scalar_params['sma_lambda']
-            for cname in components:
-                if self._model().is_salt(comp_name):
-                    vj = _index_params.get_value(cname, 'sma_nu')
-                    q_0 -= vj * q_vars[cname]
             return q_0
-        else:
-            q_0_bar = _scalar_params['sma_lambda']
-            for cname in components:
-                if self._model().is_salt(comp_name):
-                    vj = _index_params.get_value(cname, 'sma_nu')
-                    sj = _index_params.get_value(cname, 'sma_sigma')
-                    q_0_bar -= (vj+sj)*q_vars[cname]
 
-            # adsorption term
-            kads = _index_params.get_value(comp_name, 'sma_ka')
-            vi = _index_params.get_value(comp_name, 'sma_nu')
-            q_rf_salt = _scalar_params['sma_qref']
-            adsorption = kads * c_vars[comp_name] * (q_0_bar / q_rf_salt) ** vi
+        q_0_bar = _scalar_params['sma_lambda']
+        for cname in loop_nosalt:
+            sj = self.sigma(cname)
+            q_0_bar -= sj*q_vars[cname]
 
-            # desorption term
-            kdes = _index_params.get_value(comp_name, 'sma_kd')
-            c_rf_salt = _scalar_params['sma_cref']
-            desorption = kdes * q_vars[comp_name] * (c_vars[salt_name] / c_rf_salt) ** vi
+        # adsorption term
+        kads = self.kads(comp_name)
+        vi = self.nu(comp_name)
+        q_ref = _scalar_params['sma_qref']
+        adsorption = kads * c_vars[comp_name] * (q_0_bar / q_ref) ** vi
 
-            return adsorption-desorption
+        # desorption term
+        kdes = self.kdes(comp_name)
+        c_ref = _scalar_params['sma_cref']
+        desorption = kdes * q_vars[comp_name] * (c_vars[salt_name] / c_ref) ** vi
+
+        return adsorption-desorption
 
     def _write_to_cadet_input_file(self, filename, unitname, **kwargs):
 
-        self._check_model()
+        super()._write_to_cadet_input_file(filename, unitname, **kwargs)
 
         assert self._model().salt is not None, "Salt must be defined in chromatography model"
 
-        if not self.is_fully_specified():
-            print(self.get_index_parameters())
-            raise RuntimeError("Missing parameters")
-
-        _index_params = self.get_index_parameters(ids=True)
-        _scalar_params = self.get_scalar_parameters(with_defaults=True)
-
         with h5py.File(filename, 'a') as f:
             subgroup_name = os.path.join("input", "model", unitname)
-
-            if subgroup_name not in f:
-                f.create_group(subgroup_name)
             subgroup = f[subgroup_name]
-            if 'adsorption' in subgroup:
-                warnings.warn("Overwriting {}/{}".format(subgroup_name, 'adsorption'))
-                adsorption = subgroup['adsorption']
-            else:
-                adsorption = subgroup.create_group('adsorption')
+            adsorption = subgroup['adsorption']
 
-            pointer = np.array(self.is_kinetic, dtype='i')
-            adsorption.create_dataset('IS_KINETIC',
-                                      data=pointer,
-                                      dtype='i')
+            # scalar parameters
+            double_scalars = ['sma_cref', 'sma_qref']
+            int_scalars = ['sma_lambda']
 
-            # adsorption ks
-            params = {'sma_ka',
-                      'sma_kd',
-                      'sma_nu',
-                      'sma_sigma'}
+            # index parameters
+            double_index = ['sma_ka', 'sma_kd', 'sma_nu', 'sma_sigma']
+            self._cadet_writer_helper(adsorption,
+                                      int_scalars=int_scalars,
+                                      double_scalars=double_scalars,
+                                      double_index=double_index)
 
-            list_ids = self.list_components(ids=True)
-            num_components = self.num_components
-            for k in params:
-                cadet_name = k.upper()
-                param = _index_params[k]
-                pointer = np.zeros(num_components, dtype='d')
-                for i in list_ids:
-                    ordered_id = self._model()._ordered_ids_for_cadet.index(i)
-                    pointer[ordered_id] = param[i]
-
-                adsorption.create_dataset(cadet_name,
-                                          data=pointer,
-                                          dtype='d')
-
-            # scalar params
-            param_name = 'sma_lambda'
-            pointer = np.array(_scalar_params[param_name], dtype='d')
-            adsorption.create_dataset(param_name.upper(),
-                                      data=pointer,
-                                      dtype='i')
-
-            # TODO: this can be moved to based class if some additional
-            # TODO: sets are added
 
     def kads(self, comp_name):
         return self.get_index_parameter(comp_name, 'sma_ka')

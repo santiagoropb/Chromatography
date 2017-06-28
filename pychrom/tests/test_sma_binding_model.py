@@ -32,6 +32,8 @@ class TestBindingModel(unittest.TestCase):
 
         # set scalar params
         sparams['sma_lambda'] = 1200
+        sparams['sma_cref'] = 1.0
+        sparams['sma_qref'] = 50.0
 
         # components and index params
         self.comp_names = ['salt',
@@ -117,7 +119,7 @@ class TestBindingModel(unittest.TestCase):
         GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         self.assertEqual(bm.num_scalar_parameters, 1)
-        parsed = bm.get_scalar_parameters()
+        parsed = bm.get_scalar_parameters(with_defaults=True)
         unparsed = self.test_data['scalar parameters']
         self.assertTrue(equal_dictionaries(parsed, unparsed))
 
@@ -176,6 +178,8 @@ class TestSMABindingModel(unittest.TestCase):
 
         # set scalar params
         sparams['sma_lambda'] = 1200
+        sparams['sma_cref'] = 1.0
+        sparams['sma_qref'] = 1200.0
 
         # components and index params
         self.comp_names = ['salt',
@@ -292,14 +296,16 @@ class TestSMABindingModel(unittest.TestCase):
 
                 vi = self.test_data['index parameters'][cname]['sma_nu']
                 kads = self.test_data['index parameters'][cname]['sma_ka']
-                ads = kads * c_vars[cname] * (q0_bar) ** vi
+                q_ref = self.test_data['scalar parameters']['sma_qref']
+                ads = kads * c_vars[cname] * (q0_bar/q_ref) ** vi
 
                 kdes = self.test_data['index parameters'][cname]['sma_kd']
-                des = kdes * q_vars[cname] * (c_vars[GRM.salt]) ** vi
+                c_ref = self.test_data['scalar parameters']['sma_cref']
+                des = kdes * q_vars[cname] * (c_vars[GRM.salt]/c_ref) ** vi
                 dqidt[cname] = ads - des
 
         for cname in self.comp_names:
-            # print(dqidt[cname],mdqidt[cname])
+            #print(dqidt[cname],mdqidt[cname])
             self.assertAlmostEqual(dqidt[cname], mdqidt[cname])
 
     def test_write_to_cadet(self):

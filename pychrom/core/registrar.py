@@ -136,9 +136,6 @@ class Registrar(object):
     weno_defaults['weno_order'] = 3
     weno_defaults['weno_eps'] = 1e-8
 
-
-        
-
     #############################################
     # ADSORPTION parameters
     # TODO: in the future move adsorption parameters

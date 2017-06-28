@@ -20,4 +20,6 @@ index parameters: !!python/object/apply:collections.OrderedDict
       sma_nu: 3.7
       sma_sigma: 10.0
 scalar parameters:
-  sma_lambda: 1200
+  sma_lambda: 1200.0
+  sma_qref: 1200.0
+  sma_cref: 1.0

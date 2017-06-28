@@ -358,6 +358,59 @@ class DataManager(object):
             print(t, "Index parameters")
             print(tabulate(df, tablefmt="fancy_grid", headers=df.columns))
 
+    def _cadet_writer_helper(self, h5_group, **kwargs):
+
+        integer_scalars = kwargs.pop('int_scalars', [])
+        double_scalars = kwargs.pop('double_scalars', [])
+        string_scalars = kwargs.pop('str_scalars', [])
+
+        integer_index = kwargs.pop('int_index', [])
+        double_index = kwargs.pop('double_index', [])
+        #string_index = kwargs.pop('str_index', [])
+
+        scalars = dict()
+        scalars['i'] = integer_scalars
+        scalars['d'] = double_scalars
+        scalars['s'] = string_scalars
+
+        index = dict()
+        index['i'] = integer_index
+        index['d'] = double_index
+        #index['s'] = string_index
+
+        for k, lista in scalars.items():
+            for n in lista:
+                name = n.upper()
+                v = self.get_scalar_parameter(n)
+                if k == 'i' or k == 'd':
+                    dtype = k
+                    pointer = np.array(v, dtype=dtype)
+                else:
+                    dtype = 'S{}'.format(len(v) + 1)
+                    pointer = np.array(v, dtype=dtype)
+                h5_group.create_dataset(name,
+                                        data=pointer,
+                                        dtype=dtype)
+
+        num_components = self.num_components
+        index_parameters = self.get_index_parameters(with_defaults=True,
+                                                     ids=True)
+        list_ids = self.list_components(ids=True)
+        for k, lista in index.items():
+            for n in lista:
+                name = n.upper()
+                pointer = np.zeros(num_components, dtype=k)
+                for i in list_ids:
+                    ordered_id = self._model()._ordered_ids_for_cadet.index(i)
+                    pointer[ordered_id] = index_parameters.get_value(i, n)
+
+                h5_group.create_dataset(name,
+                                        data=pointer,
+                                        dtype=k)
+
+
+
+
 
     def help(self):
         print("TODO")

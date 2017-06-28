@@ -38,6 +38,7 @@ GRM.inlet.add_section('elute')
 # create binding
 GRM.salt = 'salt'
 GRM.binding = SMABinding(data="sma.yml")
+GRM.binding.is_kinetic = True
 
 # create column
 GRM.column = Column(data="column.yml")
