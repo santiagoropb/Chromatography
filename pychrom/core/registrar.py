@@ -84,12 +84,16 @@ class Registrar(object):
     column_parameters['index'].add('film_diffusion')
     column_parameters['index'].add('par_diffusion')
     column_parameters['index'].add('par_surfdiffusion')
+    #column_parameters['index'].add('cref')
+    #column_parameters['index'].add('qref')
 
     column_parameters['scalar def'] = dict()
 
     column_parameters['index def'] = dict()
     column_parameters['index def']['init_c'] = 0.0
     column_parameters['index def']['init_q'] = 0.0
+    #column_parameters['index def']['cref'] = 1.0
+    #column_parameters['index def']['qref'] = 1.0
     column_parameters['index def']['par_surfdiffusion'] = 0.0
 
     for p in column_parameters['scalar']:

@@ -16,6 +16,7 @@ import os
 
 logger = logging.getLogger(__name__)
 
+
 class CadetModeler(object):
 
     def __init__(self, model):

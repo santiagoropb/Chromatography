@@ -44,6 +44,8 @@ class TestColumn(unittest.TestCase):
 
         for cname in comp_names:
             comps[cname] = dict()
+            #comps[cname]['cref'] = 1.0
+            #comps[cname]['qref'] = 1.0
 
         # salt
         cid = 'salt'

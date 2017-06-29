@@ -48,6 +48,9 @@ class UnitOperation(DataManager, abc.ABC):
             for s in sections:
                 self.add_section(s)
 
+        self._left_connection = None
+        self._right_connection = None
+
         super().__init__(components=components, data=data, **kwargs)
 
     @property
@@ -72,6 +75,13 @@ class UnitOperation(DataManager, abc.ABC):
                      model e.g \\n m = GRModel() \\n m.inlet = Inlet(). Alternatively,
                      call inlet.attach_to_model(m, name) to fix the problem"""
             raise RuntimeError(msg)
+
+    @abc.abstractmethod
+    def is_connected(self):
+        """
+        Indicates if a unit operation is connected
+        :return: boolean
+        """
 
     @abc.abstractmethod
     def _write_to_cadet_input_file(self, filename, **kwargs):
@@ -157,6 +167,17 @@ class UnitOperation(DataManager, abc.ABC):
             print(t, "sections: ", self.list_sections())
         super().pprint(indent=indent)
 
+    def is_fully_specified(self, print_out=False, with_connections=False):
+
+        if with_connections:
+            if not self.is_connected():
+                if print_out:
+                    msg = "{} {} is not fully specified ".format(self.__class__.__name__, self.name)
+                    msg += "it is not connected"
+                    print(msg)
+                return False
+        return super().is_fully_specified(print_out=print_out)
+
 
 @UnitOperation.register
 class Inlet(UnitOperation):
@@ -213,6 +234,13 @@ class Inlet(UnitOperation):
                                  dtype='i')
 
         self._write_sections_to_cadet_input_file(filename)
+
+    def is_connected(self):
+        return self._right_connection is not None
+
+    @property
+    def right_connection(self):
+        return self._right_connection
 
 @UnitOperation.register
 class Column(UnitOperation):
@@ -384,10 +412,18 @@ class Column(UnitOperation):
     def set_par_diffusion(self, comp_name, value):
         self.set_index_parameter(comp_name, 'par_diffusion', value)
 
-    def is_fully_specified(self, print_out=False):
+    def is_fully_specified(self, print_out=False, with_connections=False):
         self._check_model()
         df = self.get_index_parameters()
         has_nan = df.isnull().values.any()
+        if with_connections:
+            if not self.is_connected():
+                if print_out:
+                    msg = "{} {} is not fully specified ".format(self.__class__.__name__, self.name)
+                    msg += "it is not connected"
+                    print(msg)
+                return False
+
         for k in self._registered_scalar_parameters:
             if k not in self.get_scalar_parameters(True).keys():
                 if print_out:
@@ -707,6 +743,19 @@ class Column(UnitOperation):
                                       data=pointer,
                                       dtype='i')
 
+    def is_connected(self):
+        lc = self._left_connection is not None
+        rc = self._right_connection is not None
+        return lc and rc
+
+    @property
+    def left_connection(self):
+        return self._left_connection
+
+    @property
+    def right_connection(self):
+        return self._right_connection
+
 
 @UnitOperation.register
 class Outlet(UnitOperation):
@@ -754,5 +803,18 @@ class Outlet(UnitOperation):
                                   dtype='i')
 
             # flow not added!! is it needed?
+
+    def is_connected(self):
+        lc = self._left_connection is not None
+        return lc
+
+    @property
+    def left_connection(self):
+        return self._left_connection
+
+    @property
+    def right_connection(self):
+        return self._right_connection
+
 
 

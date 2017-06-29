@@ -430,6 +430,9 @@ class ChromatographyModel(abc.ABC):
         ufrom = getattr(self, name_from)
         uto = getattr(self, name_to)
 
+        ufrom._right_connection = name_to
+        uto._left_connection = name_from
+
         connection = [ufrom.unit_id, uto.unit_id, -1, -1]
         for i in connection:
             self._connections.append(i)
@@ -459,6 +462,24 @@ class ChromatographyModel(abc.ABC):
         for k, v in self.unit_operations(unit_type=Outlet):
             v.pprint(indent=2)
 
+    def is_fully_specified(self, print_out=False, with_connections=True):
+
+        fully_specified = True
+        # check binding models
+        for n, e in self.binding_models():
+            fully_specified *= e.is_fully_specified(print_out=print_out)
+
+        # check sections
+        for n, e in self.sections():
+            fully_specified *= e.is_fully_specified(print_out=print_out)
+
+        # check unit operations
+        for n, e in self.unit_operations():
+            fully_specified *= e.is_fully_specified(print_out=print_out,
+                                                    with_connections=with_connections)
+
+        return fully_specified
+
     def _write_to_cadet_input_file(self,
                                   filename,
                                   tspan,
@@ -485,18 +506,8 @@ class ChromatographyModel(abc.ABC):
         if self.num_sections == 0:
             raise RuntimeError("At least one section is required in the model")
 
-        fully_specified = True
-        # check binding models
-        for n, e in self.binding_models():
-            fully_specified *= e.is_fully_specified(print_out=True)
-
-        # check sections
-        for n, e in self.sections():
-            fully_specified *= e.is_fully_specified(print_out=True)
-
-        # check unit operations
-        for n, e in self.unit_operations():
-            fully_specified *= e.is_fully_specified(print_out=True)
+        # check everything is specified
+        self.is_fully_specified(print_out=True)
 
         # before anything is written make reset sections ids based on time
         sec_times = []
