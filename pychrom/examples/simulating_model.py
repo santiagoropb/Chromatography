@@ -63,6 +63,7 @@ results = modeler.run_sim(tspan,
                           retrive_c=retrive_c,
                           keep_files=False)
 
+
 if retrive_c == 'in_out':
 
     time = results.C.coords['time']

@@ -480,6 +480,30 @@ class ChromatographyModel(abc.ABC):
 
         return fully_specified
 
+    def _sort_sections_by_time(self):
+        # check sections
+        fully_specified = True
+        for n, e in self.sections():
+            fully_specified *= e.is_fully_specified()
+        if fully_specified:
+            sec_times = []
+            for n, sec in self.sections():
+                sec_times.append(sec.start_time_sec)
+
+            # sort the section ids according to time
+            sorted_times = sorted(sec_times)
+            #ordered_names = self.list_sections()
+            for n, sec in self.sections():
+                t = sec.start_time_sec
+                new_id = sorted_times.index(t)
+                sec._section_id = new_id
+                #ordered_names[new_id] = n
+            #self._sections = ordered_names
+        else:
+            msg = "cant sort section unless they are "
+            msg += "fully specified"
+            raise RuntimeError(msg)
+
     def _write_to_cadet_input_file(self,
                                   filename,
                                   tspan,
@@ -510,16 +534,7 @@ class ChromatographyModel(abc.ABC):
         self.is_fully_specified(print_out=True)
 
         # before anything is written make reset sections ids based on time
-        sec_times = []
-        for n, sec in self.sections():
-            sec_times.append(sec.start_time_sec)
-
-        # sort the section ids according to time
-        sorted_times = sorted(sec_times)
-        for n, sec in self.sections():
-            t = sec.start_time_sec
-            new_id = sorted_times.index(t)
-            sec._section_id = new_id
+        self._sort_sections_by_time()
 
         if with_discretization:
             # check required entries in discretization

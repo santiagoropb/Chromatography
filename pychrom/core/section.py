@@ -59,6 +59,10 @@ class Section(DataManager):
 
         return len(df.columns)
 
+    @property
+    def section_id(self):
+        return self._section_id
+
     @start_time_sec.setter
     def start_time_sec(self, value):
         self.set_scalar_parameter('start_time_sec', value)

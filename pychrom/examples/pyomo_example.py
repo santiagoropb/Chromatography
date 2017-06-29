@@ -1,25 +1,64 @@
 from pychrom.core.chromatograpy_model import GRModel
+from pychrom.core.section import Section
+from pychrom.core.unit_operation import Inlet, Column, Outlet
 from pychrom.core.binding_model import SMABinding
-import pyomo.environ as pe
+from pychrom.modeling.pyomo_modeler import PyomoModeler
+import matplotlib.pyplot as plt
 
-data_filename = "example.yml"
+comps = ['salt',
+         'lysozyme',
+         'cytochrome',
+         'ribonuclease']
 
-# pychrom
-cmodel = GRModel(data_filename)
-cmodel.binding = SMABinding()
+GRM = GRModel(components=comps)
 
-# building pyomo model with help from cmodel
-components = cmodel.list_components()
-m = pe.ConcreteModel()
-m.c_var = pe.Var(components)
-m.q_var = pe.Var(components)
+# create sections
+GRM.load = Section(components=comps)
+for cname in comps:
+    GRM.load.set_a0(cname, 1.0)
+GRM.load.set_a0('salt', 50.0)
+GRM.load.start_time_sec = 0.0
 
-#m.pprint()
+GRM.wash = Section(components=comps)
+GRM.wash.set_a0('salt', 50.0)
+GRM.wash.start_time_sec = 10.0
 
-comp_name = components[0]
-print(comp_name)
-cmodel.salt = 'salt'
-dq_dt = cmodel.binding.f_ads(comp_name, m.c_var, m.q_var)
-print(dq_dt)
+GRM.elute = Section(components=comps)
+GRM.elute.set_a0('salt', 100.0)
+GRM.elute.set_a1('salt', 0.2)
+GRM.elute.start_time_sec = 90.0
+
+# create inlet
+GRM.inlet = Inlet(components=comps)
+GRM.inlet.add_section('load')
+GRM.inlet.add_section('wash')
+GRM.inlet.add_section('elute')
+
+# create binding
+GRM.salt = 'salt'
+GRM.binding = SMABinding(data="sma.yml")
+GRM.binding.is_kinetic = True
+
+# create column
+GRM.column = Column(data="column.yml")
+
+# create outlet
+GRM.outlet = Outlet(components=comps)
+
+# connect units
+GRM.connect_unit_operations('inlet', 'column')
+GRM.connect_unit_operations('column', 'outlet')
+
+# create a modeler
+modeler = PyomoModeler(GRM)
+tspan = [0.0, 500, 1500.0]
+modeler.build_ideal_model(tspan)
+
+print("done building")
+modeler.discretize_space_ideal_model()
+print("done discretizing space")
+modeler.discretize_time_ideal_model()
+print("done discretizing time")
+modeler.run_sim()
 
 

@@ -158,6 +158,7 @@ class SMABinding(BindingModel):
         :return: expression if pyomo variable or scalar value
         """
         self._check_model()
+        q_ref = kwargs.pop('q_ref', 1.0)
 
         unfixed_index_params = kwargs.pop('unfixed_index_params', None)
         unfixed_scalar_params = kwargs.pop('unfixed_scalar_params', None)
@@ -174,7 +175,6 @@ class SMABinding(BindingModel):
             raise RuntimeError("Missing parameters")
 
         _scalar_params = self.get_scalar_parameters(with_defaults=True)
-        #print(_scalar_params)
 
         assert self._model().salt is not None, "Salt must be defined in chromatography model"
 
@@ -198,16 +198,17 @@ class SMABinding(BindingModel):
             sj = self.sigma(cname)
             q_0_bar -= sj*q_vars[cname]
 
+        # scale q_0_bar
+        gamma_0_bar = q_0_bar/q_ref
+
         # adsorption term
         kads = self.kads(comp_name)
         vi = self.nu(comp_name)
-        q_ref = _scalar_params['sma_qref']
-        adsorption = kads * c_vars[comp_name] * (q_0_bar / q_ref) ** vi
+        adsorption = kads * c_vars[comp_name] * q_ref ** vi * (gamma_0_bar) ** vi
 
         # desorption term
         kdes = self.kdes(comp_name)
-        c_ref = _scalar_params['sma_cref']
-        desorption = kdes * q_vars[comp_name] * (c_vars[salt_name] / c_ref) ** vi
+        desorption = kdes * q_vars[comp_name] * (c_vars[salt_name]) ** vi
 
         return adsorption-desorption
 

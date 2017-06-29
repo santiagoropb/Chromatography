@@ -153,6 +153,10 @@ class UnitOperation(DataManager, abc.ABC):
     def list_sections(self):
         return list(self._sections)
 
+    def sections(self):
+        for n in self.list_sections():
+            yield n, getattr(self._model(), n)
+
     def _write_sections_to_cadet_input_file(self, filename):
 
         unitname = 'unit_'+str(self._unit_id).zfill(3)
@@ -332,8 +336,7 @@ class Column(UnitOperation):
         if self._binding is not None:
             return getattr(self._model(), self._binding)
         else:
-            msg = """ Binding model not set yet
-            """
+            msg = """ Binding model not set yet"""
             raise RuntimeError(msg)
 
     @binding_model.setter
