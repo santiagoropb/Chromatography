@@ -77,6 +77,12 @@ if retrive_c == 'in_out':
 
 else:
 
+    for cname in results.components:
+        to_plot = results.C.sel(component=cname)
+        to_plot.plot()
+        plt.show()
+
+    """
     fig = plt.figure()
     ax1 = fig.add_subplot(1, 1, 1)
     textos = []
@@ -99,4 +105,4 @@ else:
     n_locations = len(results.C.coords['location'])
     ani = animation.FuncAnimation(fig, animate, interval=n_locations)
     plt.show()
-
+    """
