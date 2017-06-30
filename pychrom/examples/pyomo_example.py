@@ -59,6 +59,6 @@ modeler.discretize_space_ideal_model()
 print("done discretizing space")
 modeler.discretize_time_ideal_model()
 print("done discretizing time")
-modeler.run_sim()
+modeler.run_sim(solver_opts={'halt_on_ampl_error':'yes'})
 
 

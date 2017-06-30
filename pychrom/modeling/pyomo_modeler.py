@@ -92,9 +92,12 @@ class PyomoModeler(object):
         if with_dispersion:
             self.m.dCdx2 = dae.DerivativeVar(self.m.C, wrt=(self.m.x, self.m.x))
         self.m.dCdt = dae.DerivativeVar(self.m.C, wrt=self.m.t)
+
+
         # stationary phase concentration variable
         self.m.Q = pe.Var(s, t, x)
         self.m.dQdt = dae.DerivativeVar(self.m.Q, wrt=self.m.t)
+
 
     def _build_mass_conservation_ideal_model(self,
                                            dimensionless=True,
@@ -109,7 +112,7 @@ class PyomoModeler(object):
 
         # mobile phase mass balance
         def rule_mass_balance(m, s, t, x):
-            if x in m.x.bounds() or t == m.t.bounds()[0]:
+            if x == m.x.bounds()[0] or t == m.t.bounds()[0]:
                 return pe.Constraint.Skip
             lhs = m.scale_c[s]*m.dCdt[s, t, x] + m.scale_c[s]*m.dCdx[s, t, x]
             lhs += m.scale_q[s]*F*self.m.dQdt[s, t, x]
@@ -164,7 +167,7 @@ class PyomoModeler(object):
     def _build_ic_ideal_model(self):
 
         def rule_init_c(m, s, x):
-            if x in self.m.x.bounds():
+            if x == self.m.x.bounds()[0]:
                 return pe.Constraint.Skip
             return m.scale_c[s]*m.C[s, 0.0, x] == self._column.init_c(s)
         self.m.init_c = pe.Constraint(self.m.s,
@@ -248,7 +251,7 @@ class PyomoModeler(object):
 
         self._build_adsorption_equations(dimensionless=dimensionless)
 
-        self.m.pprint()
+        #self.m.pprint()
 
     def discretize_space_ideal_model(self):
 
@@ -263,7 +266,7 @@ class PyomoModeler(object):
     def discretize_time_ideal_model(self):
 
         discretizer = pe.TransformationFactory('dae.collocation')
-        discretizer.apply_to(self.m, nfe=40, ncp=3, wrt=self.m.t)
+        discretizer.apply_to(self.m, nfe=20, ncp=3, wrt=self.m.t)
 
     def run_sim(self,
                 solver='ipopt',
