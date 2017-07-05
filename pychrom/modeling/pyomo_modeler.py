@@ -1,4 +1,6 @@
+from pychrom.modeling.pyomo.var import define_C_vars, define_Q_vars
 from pychrom.modeling.results_object import ResultsDataSet
+from pychrom.modeling.pyomo.ideal_model import IdealColumn
 from pychrom.core.unit_operation import Column
 import pyomo.environ as pe
 import pyomo.dae as dae
@@ -37,216 +39,45 @@ class PyomoModeler(object):
 
         self.m = pe.ConcreteModel()
 
-        self.wq = True
         self.dimensionless = True
+        self.wq = True
 
-    def _build_sets_ideal_model(self,
-                                 tspan,
-                                 lspan=None):
 
-        if lspan is None:
-            lspan = [0.0, self._column.length]
-        else:
-            lmax = max(lspan)
-            lmin = min(lspan)
-            if lmax > self._column.length:
-                msg = 'all elements in lspan need to be less than the length '
-                msg += 'of the column'
-                raise RuntimeError(msg)
-            if lmin < 0:
-                msg = 'all elements in lspan need to be possitive'
-                raise RuntimeError(msg)
+    def build_model(self,
+                    tspan,
+                    model_type,
+                    lspan=None,
+                    rspan=None,
+                    q_scale=None,
+                    c_scale=None,
+                    free_vars_scale=None):
 
-        if self.dimensionless:
-            u = self._column.velocity
-            l = self._column.length
-            scale = u/l
-            tao = [t*scale for t in tspan]
+        if model_type == 'IdealModel':
+            pcolumn = IdealColumn(self._column,
+                                  dimensionless=self.dimensionless)
 
-            scale = 1.0/l
-            z = [x*scale for x in lspan]
-        else:
-            tao = tspan
-            z = lspan
+            pcolumn.build_pyomo_model(tspan,
+                                      lspan=lspan,
+                                      rspan=None)
 
-        self.m.s = self._model.list_components()
-        self.m.t = dae.ContinuousSet(initialize=tao,)
-        self.m.x = dae.ContinuousSet(initialize=z)
+            self.m = pcolumn.pyomo_model()
 
-        self.m.scale_c = pe.Param(self.m.s,
-                                  initialize=1.0,
-                                  mutable=True)
+            # change scales in pyomo model
+            if isinstance(c_scale, dict):
+                for k, v in c_scale.items():
+                    self.m.sc[k] = v
 
-        self.m.scale_q = pe.Param(self.m.s,
-                                  initialize=1.0,
-                                  mutable=True)
-
-    def _build_variables_ideal_model(self):
-
-        # auxiliary aliases
-        x = self.m.x
-        t = self.m.t
-        s = self.m.s
-
-        # mobile phase scaled concentration
-        self.m.phi = pe.Var(s, t, x)
-        self.m.dphidx = dae.DerivativeVar(self.m.phi, wrt=self.m.x)
-        self.m.dphidt = dae.DerivativeVar(self.m.phi, wrt=self.m.t)
-
-        def rule_rescale_c(m, i, j, k):
-            return m.phi[i, j, k] * self.m.scale_c[i]
-
-        def rule_rescale_dcdx(m, i, j, k):
-            return m.dphidx[i, j, k] * self.m.scale_c[i]
-
-        def rule_rescale_dcdt(m, i, j, k):
-            return m.dphidt[i, j, k] * self.m.scale_c[i]
-
-        # mobile phase concentration
-        self.m.C = pe.Expression(s, t, x, rule=rule_rescale_c)
-        self.m.dCdx = pe.Expression(s, t, x, rule=rule_rescale_dcdx)
-        self.m.dCdt = pe.Expression(s, t, x, rule=rule_rescale_dcdt)
-
-        self.m.C.pprint()
-
-        if self.wq:
-            # stationary phase scaled concentration
-            self.m.gamma = pe.Var(s, t, x)
-            self.m.dgdt = dae.DerivativeVar(self.m.gamma, wrt=self.m.t)
-
-            def rule_rescale_q(m, i, j, k):
-                return m.gamma[i, j, k] * m.scale_q[i]
-
-            def rule_rescale_dqdt(m, i, j, k):
-                return m.dgdt[i, j, k] * m.scale_q[i]
-
-            # stationary phase concentration variable
-            self.m.Q = pe.Expression(s, t, x, rule=rule_rescale_q)
-            self.m.dQdt = pe.Expression(s, t, x, rule=rule_rescale_dqdt)
-
-    def _build_mass_conservation_ideal_model(self):
-
-        F = (1.0 - self._column.column_porosity) / self._column.column_porosity
-
-        # mobile phase mass balance
-        def rule_mass_balance(m, s, t, x):
-            if x == m.x.bounds()[0] or t == m.t.bounds()[0]:
-                return pe.Constraint.Skip
-            lhs = m.dCdt[s, t, x] + m.dCdx[s, t, x]
-            if self.wq:
-                lhs += F*self.m.dQdt[s, t, x]
-            rhs = 0.0
-            return lhs == rhs
-
-        self.m.mass_balance_mobile = pe.Constraint(self.m.s,
-                                                   self.m.t,
-                                                   self.m.x,
-                                                   rule=rule_mass_balance)
-
-    def _build_bc_ideal_model(self):
-
-        lin = self.m.x.bounds()[0]
-        section = None
-
-        for n, sec in self._inlet.sections():
-            if sec.section_id == 0:
-                section = sec
-
-        def rule_inlet_bc(m, s, t):
-            lhs = m.C[s, t, lin]
-            rhs = section.a0(s)
-            return lhs == rhs
-
-        self.m.inlet = pe.Constraint(self.m.s,
-                                     self.m.t,
-                                     rule=rule_inlet_bc)
-
-    def _build_ic_ideal_model(self):
-
-        def rule_init_c(m, s, x):
-            if x == self.m.x.bounds()[0]:
-                return pe.Constraint.Skip
-            return m.C[s, 0.0, x] == self._column.init_c(s)
-        self.m.init_c = pe.Constraint(self.m.s,
-                                      self.m.x,
-                                      rule=rule_init_c)
-
-        if self.wq:
-            def rule_init_q(m, s, x):
-                return m.Q[s, 0.0, x] == self._column.init_q(s)
-
-            self.m.init_q = pe.Constraint(self.m.s,
-                                          self.m.x,
-                                          rule=rule_init_q)
-
-    def _build_adsorption_equations(self):
-
-        dl_factor = 1.0
-        if self.dimensionless:
-            dl_factor = self._column.velocity*self._column.length
-
-        binding = self._column.binding_model
-        salt_scale = self.m.scale_q[self._model.salt]
-
-        def rule_adsorption(m, s, t, x):
-            if t == 0:
-                return pe.Constraint.Skip
-
-            c_var = dict()
-            q_var = dict()
-            for n in self._model.list_components():
-                c_var[n] = m.C[n, t, x]
-                q_var[n] = m.Q[n, t, x]
-
-            if self._model.is_salt(s):
-                lhs = self.m.Q[s, t, x]
-                rhs = binding.f_ads(s, c_var, q_var)
-            else:
-                if binding.is_kinetic:
-                    lhs = self.m.dQdt[s, t, x]*dl_factor
-                else:
-                    lhs = 0.0
-                rhs = binding.f_ads(s, c_var, q_var, q_ref=salt_scale)
-            return lhs == rhs
-
-        self.m.adsorption = pe.Constraint(self.m.s,
-                                          self.m.t,
-                                          self.m.x,
-                                          rule=rule_adsorption)
-
-    def build_ideal_model(self,
-                          tspan,
-                          lspan=None,
-                          q_scale=None,
-                          c_scale=None):
-
-        self._build_sets_ideal_model(tspan,
-                                     lspan=lspan)
-
-        # change scales in pyomo model
-        if isinstance(c_scale, dict):
-            for k, v in c_scale.items():
-                self.m.scale_c[k] = v
-
-        if self.wq:
             if isinstance(q_scale, dict):
                 for k, v in q_scale.items():
-                    self.m.scale_q[k] = v
+                    self.m.sq[k] = v
 
-        self._build_variables_ideal_model()
+            #self.m.pprint()
 
-        self._build_mass_conservation_ideal_model()
+        else:
+            raise NotImplementedError("Model not supported yet")
 
-        self._build_bc_ideal_model()
 
-        self._build_ic_ideal_model()
-
-        if self.wq:
-            self._build_adsorption_equations()
-
-        self.m.pprint()
-
-    def discretize_space_ideal_model(self):
+    def discretize_space(self):
 
         # Discretize using Finite Difference and Collocation
         discretizer = pe.TransformationFactory('dae.finite_difference')
@@ -256,12 +87,12 @@ class PyomoModeler(object):
                              wrt=self.m.x,
                              scheme='BACKWARD')
 
-    def discretize_time_ideal_model(self):
+    def discretize_time(self):
 
         discretizer = pe.TransformationFactory('dae.collocation')
         discretizer.apply_to(self.m, nfe=20, ncp=2, wrt=self.m.t)
 
-    def initialize_variables_ideal_model(self, init_trajectories=None):
+    def initialize_variables(self, init_trajectories=None):
 
         L = self._column.length
         u = self._column.velocity
@@ -271,9 +102,9 @@ class PyomoModeler(object):
             for s in self.m.s:
                 for t in self.m.t:
                     for x in self.m.x:
-                        self.m.phi[s, t, x].value = self._column.init_c(s)/pe.value(self.m.scale_c[s])
+                        self.m.phi[s, t, x].value = self._column.init_c(s)/pe.value(self.m.sc[s])
                         if self.wq:
-                            self.m.gamma[s, t, x].value = self._column.init_q(s)/pe.value(self.m.scale_q[s])
+                            self.m.gamma[s, t, x].value = self._column.init_q(s)/pe.value(self.m.sq[s])
         else:
             for s in self.m.s:
                 Cn = init_trajectories.C.sel(component=s)
@@ -283,9 +114,9 @@ class PyomoModeler(object):
                     for x in self.m.x:
                         xx = x/L
                         val = Cn.sel(time=tt, location=xx, method='nearest')
-                        self.m.phi[s, t, x].value = float(val)/pe.value(self.m.scale_c[s])
+                        self.m.phi[s, t, x].value = float(val)/pe.value(self.m.sc[s])
                         val = Qn.sel(time=tt, location=xx, method='nearest')
-                        self.m.gamma[s, t, x].value = float(val)/pe.value(self.m.scale_q[s])
+                        self.m.gamma[s, t, x].value = float(val)/pe.value(self.m.sq[s])
 
     def run_sim(self,
                 solver='ipopt',

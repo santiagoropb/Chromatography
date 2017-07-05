@@ -212,14 +212,14 @@ class TestSection(unittest.TestCase):
 
         components = sec.list_components()
         vals = [1.0]*len(components)
-        c_vars = dict(zip(components,vals))
+        t = 5.0
         for cname in components:
             a0 = self.test_data['index parameters'][cname]['const_coeff']
             a1 = self.test_data['index parameters'][cname]['lin_coeff']
             a2 = self.test_data['index parameters'][cname]['quad_coeff']
             a3 = self.test_data['index parameters'][cname]['cube_coeff']
-            f = a0 + a1*c_vars[cname] + a2*c_vars[cname]**2 +a3*c_vars[cname]**3
-            self.assertEqual(f, sec.f(cname, c_vars))
+            f = a0 + a1*t + a2*t**2 +a3*t**3
+            self.assertEqual(f, sec.f(cname, t))
 
     def test_write_to_cadet_input_file(self):
 

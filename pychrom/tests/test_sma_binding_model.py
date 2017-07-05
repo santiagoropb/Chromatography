@@ -33,7 +33,7 @@ class TestBindingModel(unittest.TestCase):
         # set scalar params
         sparams['sma_lambda'] = 1200
         sparams['sma_cref'] = 1.0
-        sparams['sma_qref'] = 50.0
+        sparams['sma_qref'] = 1.0
 
         # components and index params
         self.comp_names = ['salt',

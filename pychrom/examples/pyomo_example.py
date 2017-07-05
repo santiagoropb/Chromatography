@@ -48,7 +48,7 @@ GRM.outlet = Outlet(components=comps)
 # connect units
 GRM.connect_unit_operations('inlet', 'column')
 GRM.connect_unit_operations('column', 'outlet')
-for c, nu in enumerate(range(1, 4)):
+for c, nu in enumerate(range(1, 2)):
 
     # ajusta nus
     for name in GRM.list_components():
@@ -59,24 +59,26 @@ for c, nu in enumerate(range(1, 4)):
     tspan = [0.0, 500, 1500.0]
     q_scale = {'salt': 1200.0}
     c_scale = {'salt': 50.0}
-    modeler.build_ideal_model(tspan,
-                              q_scale=q_scale,
-                              c_scale=c_scale)
+
+    modeler.build_model(tspan,
+                        model_type='IdealModel',
+                        q_scale=q_scale,
+                        c_scale=c_scale)
 
     print("done building")
-    modeler.discretize_space_ideal_model()
+    modeler.discretize_space()
     print("done discretizing space")
-    modeler.discretize_time_ideal_model()
+    modeler.discretize_time()
     print("done discretizing time")
     if c == 0:
-        modeler.initialize_variables_ideal_model()
+        modeler.initialize_variables()
     else:
-        modeler.initialize_variables_ideal_model(results)
+        modeler.initialize_variables(results)
     results = modeler.run_sim(solver_opts={'halt_on_ampl_error':'yes'})
 
-    if c == 2:
-        for cname in results.components:
-            to_plot = results.C.sel(component=cname)
-            to_plot.plot()
-            plt.show()
+    #if c == 2:
+    for cname in results.components:
+        to_plot = results.C.sel(component=cname)
+        to_plot.plot()
+        plt.show()
 

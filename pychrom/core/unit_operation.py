@@ -68,6 +68,10 @@ class UnitOperation(DataManager, abc.ABC):
     def unit_id(self):
         return self._unit_id
 
+    @property
+    def salt(self):
+        return self._model().salt
+
     def _check_model(self):
         if self._model is None:
             msg = """UnitOperation not attached to a Chromatography model.
@@ -89,6 +93,9 @@ class UnitOperation(DataManager, abc.ABC):
         Append UnitOperation to cadet hdf5 input file
         :param filename: name of cadet hdf5 input file
         """
+
+    def is_salt(self, name):
+        return self._model().is_salt(name)
 
     def add_section(self, name):
         """

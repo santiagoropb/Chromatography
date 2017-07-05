@@ -91,13 +91,13 @@ class Section(DataManager):
     def set_a3(self, comp_name, value):
         return self.set_index_parameter(comp_name, 'cube_coeff', value)
 
-    def f(self, comp_name, c_var):
+    def f(self, comp_name, t):
 
         df = self.get_index_parameters(with_defaults=True)
         ordered_coeff = ['const_coeff', 'lin_coeff', 'quad_coeff', 'cube_coeff']
         accum = 0.0
         for j, coeff in enumerate(ordered_coeff):
-            accum += df.get_value(comp_name, coeff)*c_var[comp_name]**j
+            accum += df.get_value(comp_name, coeff)*t**j
         return accum
 
     def f_str(self,comp_name):
