@@ -1,0 +1,25 @@
+index parameters: !!python/object/apply:collections.OrderedDict
+- - - A
+    - sma_ka: 0.0
+      sma_kd: 0.0
+      sma_nu: 0.0
+      sma_sigma: 0.0
+  - - B
+    - sma_ka: 35.5
+      sma_kd: 1000.0
+      sma_nu: 4.7
+      sma_sigma: 11.83
+  - - C
+    - sma_ka: 1.59
+      sma_kd: 1000.0
+      sma_nu: 5.29
+      sma_sigma: 10.6
+  - - D
+    - sma_ka: 7.7
+      sma_kd: 1000.0
+      sma_nu: 3.7
+      sma_sigma: 10.0
+scalar parameters:
+  sma_lambda: 1200.0
+  sma_qref: 1200.0
+
