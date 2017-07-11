@@ -142,8 +142,6 @@ class Registrar(object):
 
     #############################################
     # ADSORPTION parameters
-    # TODO: in the future move adsorption parameters
-    # TODO: to the multi_index set
 
     ########## SMA
     adsorption_parameters = dict()
@@ -179,4 +177,29 @@ class Registrar(object):
 
     for p, v in adsorption_parameters['sma']['index def'].items():
         default_scalar_parameters[p] = v
+
+    ########## Multi-Component Langmuir
+
+    adsorption_parameters['mcl'] = dict()
+    adsorption_parameters['mcl']['scalar'] = set()
+    adsorption_parameters['mcl']['index'] = set()
+
+    adsorption_parameters['mcl']['scalar def'] = dict()
+    adsorption_parameters['mcl']['index def'] = dict()
+
+    # multi-component langmuir adsorption parameters
+    # no scalar parameters for multi-component langmuir adsorption model
+
+    # index parameters
+    adsorption_parameters['mcl']['index'].add('mcl_ka')
+    adsorption_parameters['mcl']['index'].add('mcl_kd')
+    adsorption_parameters['mcl']['index'].add('mcl_qmax')
+
+    for p in adsorption_parameters['mcl']['index']:
+        single_index_parameters.add(p)
+
+    for p, v in adsorption_parameters['mcl']['index def'].items():
+        default_scalar_parameters[p] = v
+        
+    
 

@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 
+
 class SmoothFunction(object):
 
     def __init__(self,
