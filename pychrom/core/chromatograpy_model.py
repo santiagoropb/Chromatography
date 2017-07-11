@@ -492,13 +492,10 @@ class ChromatographyModel(abc.ABC):
 
             # sort the section ids according to time
             sorted_times = sorted(sec_times)
-            #ordered_names = self.list_sections()
             for n, sec in self.sections():
                 t = sec.start_time_sec
                 new_id = sorted_times.index(t)
                 sec._section_id = new_id
-                #ordered_names[new_id] = n
-            #self._sections = ordered_names
         else:
             msg = "cant sort section unless they are "
             msg += "fully specified"
@@ -512,8 +509,6 @@ class ChromatographyModel(abc.ABC):
                                   **kwargs):
 
         # TODO: extend to allow different discretizations for different columns
-        # TODO: set unit_ids of sections based on start times!
-        # TODO: make all the write_to cadet in core private functions _
 
         active_sec = kwargs.pop('active_set', 'default')
         with_solver = kwargs.pop('with_solver', True)

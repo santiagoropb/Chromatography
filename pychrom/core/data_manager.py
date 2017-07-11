@@ -46,6 +46,10 @@ class DataManager(object):
         # set name
         self._name = None
 
+        # only for used in data manager defaults
+        self._provided_default_scalar_params = set()
+        self._provided_default_index_params = set()
+
         #super().__init__()
 
     @property
@@ -102,6 +106,8 @@ class DataManager(object):
 
             for k, v in parsed.items():
                 self._scalar_params[k] = v
+                if k in self._default_scalar_params.keys():
+                    self._provided_default_scalar_params.add(k)
 
     def _parse_index_parameters(self):
 
@@ -116,6 +122,11 @@ class DataManager(object):
                                                                    map_id,
                                                                    registered_inputs,
                                                                    default_inputs)
+            for comp, params in dict_inputs.items():
+                for param in params.keys():
+                    if param in self._default_index_params.keys():
+                        self._provided_default_index_params.add(param)
+
             if self._passed_components is not None:
                 sub_list = list()
                 for name in self._passed_components:
@@ -150,6 +161,11 @@ class DataManager(object):
             self._index_params = pd_utils.add_row_to_df(self._index_params,
                                                         cid,
                                                         parameters=parameters)
+            if parameters is not None:
+                for param in parameters.keys():
+                    if param in self._default_index_params.keys():
+                        self._provided_default_index_params.add(param)
+
             self._components.add(cid)
 
     def get_scalar_parameter(self, name):
@@ -183,11 +199,15 @@ class DataManager(object):
         if isinstance(name, six.string_types):
             assert name in self._registered_scalar_parameters
             self._scalar_params[name] = value
+            if name in self._default_scalar_params.keys():
+                self._provided_default_scalar_params.add(name)
         elif (isinstance(name, list) or isinstance(name, tuple)) and \
                 (isinstance(value, list) or isinstance(value, tuple)):
             for i, n in enumerate(name):
-                assert name in self._registered_scalar_parameters
+                assert n in self._registered_scalar_parameters
                 self._scalar_params[n] = value[i]
+                if n in self._default_scalar_params.keys():
+                    self._provided_default_scalar_params.add(n)
         else:
             raise RuntimeError("input not recognized")
 
@@ -202,6 +222,9 @@ class DataManager(object):
                                  name,
                                  value)
 
+        if name in self._default_index_params.keys():
+            self._provided_default_index_params.add(name)
+
     def get_scalar_parameters(self, with_defaults=False):
         """
 
@@ -214,6 +237,7 @@ class DataManager(object):
         for n, v in self._scalar_params.items():
             if n not in self._default_scalar_params.keys():
                 container[n] = v
+
         return container
 
     def get_index_parameters(self, with_defaults=False, ids=False, form='dataframe'):
@@ -407,10 +431,6 @@ class DataManager(object):
                 h5_group.create_dataset(name,
                                         data=pointer,
                                         dtype=k)
-
-
-
-
 
     def help(self):
         print("TODO")

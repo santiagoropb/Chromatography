@@ -40,8 +40,7 @@ class PyomoModeler(object):
         self.m = pe.ConcreteModel()
 
         self.dimensionless = True
-        self.wq = True
-
+        self.wq = False
 
     def build_model(self,
                     tspan,
@@ -54,7 +53,8 @@ class PyomoModeler(object):
 
         if model_type == 'IdealModel':
             pcolumn = IdealColumn(self._column,
-                                  dimensionless=self.dimensionless)
+                                  dimensionless=self.dimensionless,
+                                  with_q=self.wq)
 
             pcolumn.build_pyomo_model(tspan,
                                       lspan=lspan,
@@ -70,7 +70,6 @@ class PyomoModeler(object):
             if isinstance(q_scale, dict):
                 for k, v in q_scale.items():
                     self.m.sq[k] = v
-
             #self.m.pprint()
 
         else:
@@ -90,7 +89,7 @@ class PyomoModeler(object):
     def discretize_time(self):
 
         discretizer = pe.TransformationFactory('dae.collocation')
-        discretizer.apply_to(self.m, nfe=20, ncp=2, wrt=self.m.t)
+        discretizer.apply_to(self.m, nfe=30, ncp=2, wrt=self.m.t)
 
     def initialize_variables(self, init_trajectories=None):
 

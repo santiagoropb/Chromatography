@@ -100,7 +100,7 @@ class Section(DataManager):
             accum += df.get_value(comp_name, coeff)*t**j
         return accum
 
-    def f_str(self,comp_name):
+    def f_str(self, comp_name):
         df = self.get_index_parameters(with_defaults=True)
         ordered_coeff = ['const_coeff', 'lin_coeff', 'quad_coeff', 'cube_coeff']
         accum = ''
@@ -114,7 +114,6 @@ class Section(DataManager):
         if accum=='':
             accum='0.0'
         return accum
-
 
     def _check_model(self):
         if self._model is None:

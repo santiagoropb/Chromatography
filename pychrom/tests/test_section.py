@@ -67,7 +67,6 @@ class TestSection(unittest.TestCase):
         comps[cid]['quad_coeff'] = 0.0
         comps[cid]['cube_coeff'] = 0.0
 
-
     def test_is_fully_specified(self):
 
         GRM = self.m

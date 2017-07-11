@@ -1,5 +1,6 @@
 from pychrom.modeling.pyomo.var import define_C_vars, define_Q_vars, define_free_sites_vars
 from pychrom.modeling.pyomo.pyomo_column import PyomoColumn
+from pychrom.utils.smoothing import PieceWiseNamedFunction, smooth_named_functions
 import pyomo.environ as pe
 import pyomo.dae as dae
 import logging
@@ -10,12 +11,12 @@ logger = logging.getLogger(__name__)
 
 class IdealColumn(PyomoColumn):
 
-    def __init__(self, column, dimensionless=True):
+    def __init__(self, column, dimensionless=True, with_q=True):
 
         super().__init__(column, dimensionless=dimensionless)
 
         # tmp attribute
-        self.wq = True
+        self.wq = with_q
 
     def setup_base(self, tspan, lspan=None, rspan=None):
         """
@@ -117,89 +118,92 @@ class IdealColumn(PyomoColumn):
         :return: boolean
         """
 
-        dl_factor = 1.0
-        if self.dimensionless:
-            dl_factor = self._column.velocity * self._column.length
+        if self.wq:
+            dl_factor = 1.0
+            if self.dimensionless:
+                dl_factor = self._column.velocity * self._column.length
 
-        binding = self._column.binding_model
-        salt_name = self._column.salt
-        salt_scale = self.m.sq[salt_name]
+            binding = self._column.binding_model
+            salt_name = self._column.salt
+            salt_scale = self.m.sq[salt_name]
 
-        def rule_adsorption(m, s, t, x):
-            if t == 0:
-                return pe.Constraint.Skip
+            def rule_adsorption(m, s, t, x):
+                if t == 0:
+                    return pe.Constraint.Skip
 
-            c_var = dict()
-            q_var = dict()
-            for n in self._column.list_components():
-                c_var[n] = m.C[n, t, x]
-                q_var[n] = m.Q[n, t, x]
+                c_var = dict()
+                q_var = dict()
+                for n in self._column.list_components():
+                    c_var[n] = m.C[n, t, x]
+                    q_var[n] = m.Q[n, t, x]
 
-            if self._column.is_salt(s):
-                lhs = self.m.Q[s, t, x]
-                rhs = binding.f_ads(s, c_var, q_var)
-            else:
-                if binding.is_kinetic:
-                    lhs = self.m.dQdt[s, t, x] * dl_factor
+                if self._column.is_salt(s):
+                    lhs = self.m.Q[s, t, x]
+                    rhs = binding.f_ads(s, c_var, q_var)
                 else:
-                    lhs = 0.0
-                rhs = binding.f_ads(s, c_var, q_var, q_ref=salt_scale)
+                    if binding.is_kinetic:
+                        lhs = self.m.dQdt[s, t, x] * dl_factor
+                    else:
+                        lhs = 0.0
+                    rhs = binding.f_ads(s, c_var, q_var, q_ref=salt_scale)
 
-            return lhs == rhs
+                return lhs == rhs
 
-        self.m.adsorption = pe.Constraint(self.m.s,
-                                          self.m.t,
-                                          self.m.x,
-                                          rule=rule_adsorption)
+            self.m.adsorption = pe.Constraint(self.m.s,
+                                              self.m.t,
+                                              self.m.x,
+                                              rule=rule_adsorption)
 
-        self.m.adsorption.pprint()
+            self.m.adsorption.pprint()
 
     def build_adsorption_equations2(self):
 
-        dl_factor = 1.0
-        if self.dimensionless:
-            dl_factor = self._column.velocity * self._column.length
+        if self.wq:
+            dl_factor = 1.0
+            if self.dimensionless:
+                dl_factor = self._column.velocity * self._column.length
 
-        binding = self._column.binding_model
-        salt_name = self._column.salt
+            binding = self._column.binding_model
+            salt_name = self._column.salt
 
-        def rule_adsorption(m, s, t, x):
-            if t == 0:
-                return pe.Constraint.Skip
+            def rule_adsorption(m, s, t, x):
+                if t == 0:
+                    return pe.Constraint.Skip
 
-            c_var = dict()
-            q_var = dict()
-            for n in self._column.list_components():
-                c_var[n] = m.C[n, t, x]
-                q_var[n] = m.Q[n, t, x]
+                c_var = dict()
+                q_var = dict()
+                for n in self._column.list_components():
+                    c_var[n] = m.C[n, t, x]
+                    q_var[n] = m.Q[n, t, x]
 
-            if s == salt_name:
-                lhs = self.m.Q[s, t, x]
-                rhs = binding.f_ads_given_free_sites(s, c_var, q_var, m.free_sites[t, x])
+                if s == salt_name:
+                    lhs = self.m.Q[s, t, x]
+                    rhs = binding.f_ads_given_free_sites(s, c_var, q_var, m.free_sites[t, x])
 
-            elif s == 'free_sites':
-                lhs = self.m.free_sites[t, x]
-                rhs = binding.f_ads_given_free_sites(s, c_var, q_var, m.free_sites[t, x])
+                elif s == 'free_sites':
+                    lhs = self.m.free_sites[t, x]
+                    rhs = binding.f_ads_given_free_sites(s, c_var, q_var, m.free_sites[t, x])
 
-            else:
-                if binding.is_kinetic:
-                    lhs = self.m.dQdt[s, t, x] * dl_factor
                 else:
-                    lhs = 0.0
+                    if binding.is_kinetic:
+                        lhs = self.m.dQdt[s, t, x] * dl_factor
+                    else:
+                        lhs = 0.0
 
-                rhs = binding.f_ads_given_free_sites(s, c_var, q_var, m.free_sites[t, x])
-            return lhs == rhs
+                    rhs = binding.f_ads_given_free_sites(s, c_var, q_var, m.free_sites[t, x])
+                return lhs == rhs
 
-        species = set(self.m.s)
-        species.add('free_sites')
-        self.m.adsorption = pe.Constraint(species,
-                                          self.m.t,
-                                          self.m.x,
-                                          rule=rule_adsorption)
+            species = set(self.m.s)
+            species.add('free_sites')
+            self.m.adsorption = pe.Constraint(species,
+                                              self.m.t,
+                                              self.m.x,
+                                              rule=rule_adsorption)
 
-        self.m.adsorption.pprint()
-
-        return True
+            self.m.adsorption.pprint()
+            return True
+        else:
+            return False
 
     def build_boundary_conditions(self):
         """
@@ -209,19 +213,51 @@ class IdealColumn(PyomoColumn):
 
         lin = self.m.x.bounds()[0]
         section = None
+        section_functions = dict()
+        break_times = []
 
-        for n, sec in self._inlet.sections():
-            if sec.section_id == 0:
-                section = sec
+        if not self.dimensionless:
+            for n, sec in self._inlet.sections(ordered=True):
+                break_times.append(sec.start_time_sec)
+
+        else:
+            u = self._column.velocity
+            l = self._column.length
+            scale = u / l
+            for n, sec in self._inlet.sections(ordered=True):
+                t = sec.start_time_sec*scale
+                break_times.append(t)
+
+        # add end of time
+        end_time = self.m.t.bounds()[1]
+        break_times.append(end_time)
+
+        smooth = False
+
+        if smooth:
+            for name in self._column.list_components():
+                list_functions = list()
+                for n, sec in self._inlet.sections(ordered=True):
+                    list_functions.append(sec.f)
+                component_function = smooth_named_functions(list_functions, break_times, name)
+                section_functions[name] = component_function
+        else:
+            for name in self._column.list_components():
+                list_functions = list()
+                for n, sec in self._inlet.sections(ordered=True):
+                    list_functions.append(sec.f)
+                component_function = PieceWiseNamedFunction(list_functions, break_times, name)
+                section_functions[name] = component_function
 
         def rule_inlet_bc(m, s, t):
             lhs = m.C[s, t, lin]
-            rhs = section.a0(s)
+            rhs = section_functions[s](s, t)
             return lhs == rhs
 
         self.m.inlet = pe.Constraint(self.m.s,
                                      self.m.t,
                                      rule=rule_inlet_bc)
+        self.m.inlet.pprint()
 
     def build_initial_conditions(self):
         """

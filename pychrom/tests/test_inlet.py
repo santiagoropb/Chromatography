@@ -40,6 +40,8 @@ class TestInlet(unittest.TestCase):
 
         GRM.inlet = Inlet(components=self.model_components)
 
+
+
     def test_unit_type(self):
         inlet = self.m.inlet
         self.assertEqual(inlet._unit_type, UnitOperationType.INLET)
@@ -58,6 +60,28 @@ class TestInlet(unittest.TestCase):
         self.assertEqual(GRM.inlet.num_sections, 2)
         GRM.inlet.add_section('elute')
         self.assertEqual(GRM.inlet.num_sections, 3)
+
+    def test_list_sections(self):
+
+        GRM = self.m
+        GRM.load.start_time_sec = 0.0
+        GRM.wash.start_time_sec = 10.0
+        GRM.elute.start_time_sec = 20.0
+
+        GRM.inlet.add_section('elute')
+        GRM.inlet.add_section('wash')
+        GRM.inlet.add_section('load')
+
+        sl = GRM.inlet.list_sections(ordered=True)
+        self.assertEqual(sl[0], 'load')
+        self.assertEqual(sl[1], 'wash')
+        self.assertEqual(sl[2], 'elute')
+
+        GRM.wash.start_time_sec = np.nan
+        sl = GRM.inlet.list_sections(ordered=True)
+        self.assertEqual(sl[0], 'load')
+        self.assertEqual(sl[1], 'elute')
+        self.assertEqual(sl[2], 'wash')
 
     def test_write_to_cadet(self):
 

@@ -7,6 +7,7 @@ from enum import Enum
 import pandas as pd
 import numpy as np
 import logging
+import operator as oper
 import h5py
 import abc
 import six
@@ -157,11 +158,25 @@ class UnitOperation(DataManager, abc.ABC):
         if name in self._sections:
             return getattr(self._model(), name)
 
-    def list_sections(self):
-        return list(self._sections)
+    def list_sections(self, ordered=False):
+        if not ordered:
+            return list(self._sections)
+        else:
+            sec_to_times = dict()
+            for name in self._sections:
+                sec = self.get_section(name)
+                t = sec.start_time_sec
+                if np.isnan(t):
+                    sec_to_times[name] = np.inf
+                else:
+                    sec_to_times[name] = t
 
-    def sections(self):
-        for n in self.list_sections():
+            sorted_sections = sorted(sec_to_times.items(), key=oper.itemgetter(1))
+            sorted_names = [k[0] for k in sorted_sections]
+            return sorted_names
+
+    def sections(self, ordered=False):
+        for n in self.list_sections(ordered=ordered):
             yield n, getattr(self._model(), n)
 
     def _write_sections_to_cadet_input_file(self, filename):
