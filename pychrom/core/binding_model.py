@@ -199,12 +199,12 @@ class SMABinding(BindingModel):
             q_0_bar -= sj*q_vars[cname]
 
         # scale q_0_bar
-        gamma_0_bar = q_0_bar/q_ref
-
+        #gamma_0_bar = q_0_bar*q_ref
+        gamma_0_bar = q_0_bar
         # adsorption term
         kads = self.kads(comp_name)
         vi = self.nu(comp_name)
-        adsorption = kads * c_vars[comp_name] * q_ref ** vi * (gamma_0_bar) ** vi
+        adsorption = kads * c_vars[comp_name] * (gamma_0_bar) ** vi
 
         # desorption term
         kdes = self.kdes(comp_name)

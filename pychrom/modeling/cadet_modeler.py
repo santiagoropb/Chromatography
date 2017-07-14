@@ -227,7 +227,7 @@ class CadetModeler(object):
                                                             result_set.col_locs],
                                                     dims=['component',
                                                           'time',
-                                                          'location'])
+                                                          'col_loc'])
 
                     elif 'SOLUTION_COLUMN' in col_group and 'SOLUTION_PARTICLE' in col_group:
                         shapes = col_group['SOLUTION_PARTICLE'].shape
@@ -252,7 +252,7 @@ class CadetModeler(object):
                                                             result_set.col_locs],
                                                     dims=['component',
                                                           'time',
-                                                          'location'])
+                                                          'col_loc'])
 
                         # store Cp data
                         b = col_group['SOLUTION_PARTICLE']
@@ -280,8 +280,8 @@ class CadetModeler(object):
                                                             result_set.par_locs],
                                                     dims=['component',
                                                           'time',
-                                                          'column location',
-                                                          'particle location'])
+                                                          'col_loc',
+                                                          'par_loc'])
 
                     else:
                         raise RuntimeError('Parsing selection not found')

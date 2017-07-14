@@ -19,7 +19,7 @@ class SmoothFunction(object):
         self._n_points = 50
         self._start = start
         self._end = end
-        self._band = 0.05
+        self._band = 0.02
         self._k = 1.0
 
     def f1(self, x):
@@ -90,7 +90,7 @@ class SmoothNamedFunction(object):
         self._n_points = 50
         self._start = start
         self._end = end
-        self._band = 0.05
+        self._band = 0.02
         self._k = 1.0
         self._name = name
 
@@ -195,8 +195,10 @@ class PieceWiseFunction(object):
 
     def __call__(self, *args, **kwargs):
         x = args[0]
-
-        idx = np.argmax(self.points > x)
+        greater_than = self.points > x
+        if np.all(greater_than == False):
+            return self.functions[-1](x)
+        idx = np.argmax(greater_than)
         if idx == 0:
             return self.functions[idx](x)
         else:
@@ -214,7 +216,10 @@ class PieceWiseNamedFunction(object):
     def __call__(self, *args, **kwargs):
         x = args[1]
         n = args[0]
-        idx = np.argmax(self.points >= x)
+        greater_than = self.points > x
+        if np.all(greater_than == False):
+            return self.functions[-1](n, x)
+        idx = np.argmax(greater_than)
         if idx == 0:
             return self.functions[idx](n, x)
         else:

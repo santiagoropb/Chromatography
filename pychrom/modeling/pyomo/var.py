@@ -38,7 +38,7 @@ def define_C_vars(model, scale_vars=True, with_second_der=False):
         model.dCdx = dae.DerivativeVar(model.C, wrt=model.x)
         model.dCdt = dae.DerivativeVar(model.C, wrt=model.t)
         if with_second_der:
-            model.dCdx2 = dae.DerivativeVar(model.phi, wrt=(model.x, model.x))
+            model.dCdx2 = dae.DerivativeVar(model.C, wrt=(model.x, model.x))
 
 
 def define_Cp_vars(model, scale_vars=True, index_radius=False, **kwargs):
@@ -169,7 +169,7 @@ def define_free_sites_vars(model, scale_vars=True, index_radius=False):
 
     if not index_radius:
         if scale_vars:
-            model.theta = pe.Var(model.t, model.x)
+            model.theta = pe.Var(model.t, model.x, bounds=(None,None))
 
             def rule_rescale_free_sites(m, j, k):
                 return m.theta[j, k] * m.sf
@@ -177,10 +177,10 @@ def define_free_sites_vars(model, scale_vars=True, index_radius=False):
             # stationary phase concentration variable
             model.free_sites = pe.Expression(model.t, model.x, rule=rule_rescale_free_sites)
         else:
-            model.free_sites = pe.Var(model.t, model.x)
+            model.free_sites = pe.Var(model.t, model.x, bounds=(None,None))
     else:
         if scale_vars:
-            model.theta = pe.Var(model.t, model.x, model.r)
+            model.theta = pe.Var(model.t, model.x, model.r, bounds=(None,None))
 
             def rule_rescale_free_sites(m, j, k, w):
                 return m.theta[j, k, w] * m.sf
@@ -188,4 +188,4 @@ def define_free_sites_vars(model, scale_vars=True, index_radius=False):
             # stationary phase concentration variable
             model.free_sites = pe.Expression(model.t, model.x, model.r, rule=rule_rescale_free_sites)
         else:
-            model.free_sites = pe.Var(model.t, model.x, model.r)
+            model.free_sites = pe.Var(model.t, model.x, model.r, bounds=(0.0,None))

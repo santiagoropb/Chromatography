@@ -1,16 +1,9 @@
-from pychrom.modeling.pyomo.var import define_C_vars, define_Q_vars
-from pychrom.modeling.results_object import ResultsDataSet
-from pychrom.modeling.pyomo.ideal_model import IdealColumn
+from pychrom.modeling.pyomo.models import IdealConvectiveColumn, ConvectionModel
+from pychrom.modeling.pyomo.models import IdealDispersiveColumn, DispersionModel
 from pychrom.core.unit_operation import Column
 import pyomo.environ as pe
-import pyomo.dae as dae
-from pychrom.core.registrar import Registrar
-import matplotlib.pyplot as plt
-import xarray as xr
-import numpy as np
 import warnings
 import logging
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -31,15 +24,19 @@ class PyomoModeler(object):
         if not self._model.is_fully_specified(print_out=True):
             raise RuntimeError('PyomoModeler requires a fully specified chromatography model')
 
-        self._model._sort_sections_by_time()
-
+        # gets helpers to build pyomo model
         self._column = getattr(self._model, columns[0])
         self._inlet = getattr(self._model, self._column.left_connection)
         self._outlet = getattr(self._model, self._column.right_connection)
 
-        self.m = pe.ConcreteModel()
+        # alias for pyomo model
+        self.pyomo_column = None
 
-        self.dimensionless = True
+        # determine if concentration variables are being scaled
+        self._scale_q = False
+        self._scale_c = False
+
+        # tmp flag
         self.wq = False
 
     def build_model(self,
@@ -49,73 +46,63 @@ class PyomoModeler(object):
                     rspan=None,
                     q_scale=None,
                     c_scale=None,
-                    free_vars_scale=None):
+                    options=None):
 
-        if model_type == 'IdealModel':
-            pcolumn = IdealColumn(self._column,
-                                  dimensionless=self.dimensionless,
-                                  with_q=self.wq)
+        if options is None:
+            options = dict()
 
-            pcolumn.build_pyomo_model(tspan,
-                                      lspan=lspan,
-                                      rspan=None)
+        if isinstance(q_scale, dict):
+            options['scale_q'] = True
+            self._scale_q = True
+        if isinstance(c_scale, dict):
+            options['scale_c'] = True
+            self._scale_c = True
 
-            self.m = pcolumn.pyomo_model()
-
-            # change scales in pyomo model
-            if isinstance(c_scale, dict):
-                for k, v in c_scale.items():
-                    self.m.sc[k] = v
-
-            if isinstance(q_scale, dict):
-                for k, v in q_scale.items():
-                    self.m.sq[k] = v
-            #self.m.pprint()
-
+        if model_type == 'ConvectionModel':
+            self.pyomo_column = ConvectionModel(self._column)
+            self.pyomo_column.build_pyomo_model(tspan, lspan=lspan, rspan=None, **options)
+        elif model_type == 'DispersionModel':
+            self.pyomo_column = DispersionModel(self._column)
+            self.pyomo_column.build_pyomo_model(tspan, lspan=lspan, rspan=None, **options)
+        elif model_type == 'IdealConvectiveModel':
+            self.pyomo_column = IdealConvectiveColumn(self._column)
+            self.pyomo_column.build_pyomo_model(tspan, lspan=lspan, rspan=None, **options)
+        elif model_type == 'IdealDispersiveModel':
+            self.pyomo_column = IdealDispersiveColumn(self._column)
+            self.pyomo_column.build_pyomo_model(tspan, lspan=lspan, rspan=None, **options)
         else:
             raise NotImplementedError("Model not supported yet")
 
+        m = self.pyomo_column.m
+        # change scales in pyomo model
+        if self._scale_c:
+            for k, v in c_scale.items():
+                m.sc[k] = v
+
+        if self._scale_q:
+            for k, v in q_scale.items():
+                m.sq[k] = v
 
     def discretize_space(self):
 
-        # Discretize using Finite Difference and Collocation
-        discretizer = pe.TransformationFactory('dae.finite_difference')
+        m = self.pyomo_column.m
 
-        discretizer.apply_to(self.m,
-                             nfe=50,
-                             wrt=self.m.x,
-                             scheme='BACKWARD')
+        # Discretize using Finite Difference
+        discretizer = pe.TransformationFactory('dae.finite_difference')
+        discretizer.apply_to(m, nfe=50, wrt=m.x, scheme='BACKWARD')
+
+        #discretizer = pe.TransformationFactory('dae.collocation')
+        #discretizer.apply_to(m, nfe=40, ncp=3, wrt=m.x)
 
     def discretize_time(self):
+        m = self.pyomo_column.m
 
+        # Discretize using Finite elements and collocation
         discretizer = pe.TransformationFactory('dae.collocation')
-        discretizer.apply_to(self.m, nfe=30, ncp=2, wrt=self.m.t)
+        discretizer.apply_to(m, nfe=60, ncp=2, wrt=m.t)
 
-    def initialize_variables(self, init_trajectories=None):
-
-        L = self._column.length
-        u = self._column.velocity
-        t_factor = u / L
-
-        if init_trajectories is None:
-            for s in self.m.s:
-                for t in self.m.t:
-                    for x in self.m.x:
-                        self.m.phi[s, t, x].value = self._column.init_c(s)/pe.value(self.m.sc[s])
-                        if self.wq:
-                            self.m.gamma[s, t, x].value = self._column.init_q(s)/pe.value(self.m.sq[s])
-        else:
-            for s in self.m.s:
-                Cn = init_trajectories.C.sel(component=s)
-                Qn = init_trajectories.Q.sel(component=s)
-                for t in self.m.t:
-                    tt = t*t_factor
-                    for x in self.m.x:
-                        xx = x/L
-                        val = Cn.sel(time=tt, location=xx, method='nearest')
-                        self.m.phi[s, t, x].value = float(val)/pe.value(self.m.sc[s])
-                        val = Qn.sel(time=tt, location=xx, method='nearest')
-                        self.m.gamma[s, t, x].value = float(val)/pe.value(self.m.sq[s])
+    def initialize_variables(self, trajectories=None):
+        self.pyomo_column.initialize_variables(trajectories=trajectories)
 
     def run_sim(self,
                 solver='ipopt',
@@ -126,60 +113,9 @@ class PyomoModeler(object):
             for k, v in solver_opts.items():
                 opt.options[k] = v
 
-        results = opt.solve(self.m, tee=True)
+        m = self.pyomo_column.m
+        opt.solve(m, tee=True)
 
-        return self._parse_results()
-
-    def _parse_results(self):
-
-        nt = len(self.m.t)
-        ns = len(self.m.s)
-        nx = len(self.m.x)
-
-        sorted_x = sorted(self.m.x)
-        sorted_s = sorted(self.m.s)
-        sorted_t = sorted(self.m.t)
-
-        conc = np.zeros((ns, nt, nx))
-        if self.wq:
-            q_array = np.zeros((ns, nt, nx))
-
-        for i, s in enumerate(sorted_s):
-            for j, t in enumerate(sorted_t):
-                for k, x in enumerate(sorted_x):
-                    conc[i, j, k] = pe.value(self.m.C[s, t, x])
-                    if self.wq:
-                        q_array[i, j, k] = pe.value(self.m.Q[s, t, x])
-
-        result_set = ResultsDataSet()
-        result_set.components = np.array(sorted_s)
-        if not self.dimensionless:
-            result_set.times = np.array(sorted_t)
-            result_set.col_locs = np.array(sorted_x)
-        else:
-            L = self._column.length
-            u = self._column.velocity
-            t_factor = L/u
-            result_set.times = np.array([t*t_factor for t in sorted_t])
-            result_set.col_locs = np.array([x*L for x in sorted_x])
-
-        # store concentrations
-        result_set.C = xr.DataArray(conc,
-                                    coords=[result_set.components,
-                                            result_set.times,
-                                            result_set.col_locs],
-                                    dims=['component',
-                                          'time',
-                                          'location'])
-
-        if self.wq:
-            result_set.Q = xr.DataArray(q_array,
-                                        coords=[result_set.components,
-                                                result_set.times,
-                                                result_set.col_locs],
-                                        dims=['component',
-                                              'time',
-                                              'location'])
-
-        return result_set
+        results_set = self.pyomo_column.store_values_in_data_set()
+        return results_set
 
