@@ -21,7 +21,7 @@ m.dCdt = dae.DerivativeVar(m.C, wrt=m.t)
 def rule_pde(m, t, x):
 
     v = 0.000575
-    if x == m.x.bounds()[0] or t == m.t.bounds()[0]:
+    if x == m.x.first() or t == m.t.first():
         return pe.Constraint.Skip
     lhs = m.dCdt[t, x]
     rhs = -v*m.dCdx[t, x]
@@ -32,11 +32,11 @@ m.pde = pe.Constraint(m.t, m.x, rule=rule_pde)
 
 
 def rule_bc(m, t):
-    lin = m.x.bounds()[0]
-    if t == m.t.bounds()[0]:
+    lin = m.x.first()
+    if t == m.t.first():
         return pe.Constraint.Skip
     lhs = m.C[t, lin]
-    rhs = 1.0 if t < 10.0 else 0.0
+    rhs = 1.00 if t < 10.0 else 0.0
     return lhs == rhs
 
 # boundary condition

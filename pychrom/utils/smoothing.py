@@ -19,7 +19,7 @@ class SmoothFunction(object):
         self._n_points = 50
         self._start = start
         self._end = end
-        self._band = 0.02
+        self._band = 0.05
         self._k = 1.0
 
     def f1(self, x):
@@ -42,31 +42,36 @@ class SmoothFunction(object):
         n_points = self._n_points
 
         start = self._start + 0.6*(self._b-self._start)
-        end = start = self._b + 0.4*(self._end-self._b)
+        end = self._b + 0.4*(self._end-self._b)
         data_p = np.linspace(start,
                              end,
                              n_points)
 
-        sampled = list(map(self.discontinuous_f, data_p))
+        difference = sum(abs(self.f1(p) - self.f2(p)) for p in data_p)
+        if difference > 0:
 
-        def init_y(m, i):
-            return sampled[i]
+            sampled = list(map(self.discontinuous_f, data_p))
 
-        m.y = pe.Var(range(n_points), initialize=init_y)
+            def init_y(m, i):
+                return sampled[i]
 
-        m.c_list = pe.ConstraintList()
-        for i, x in enumerate(data_p):
-            sigma = 1.0 / (1 + pe.exp(-m.k * (x - self._b)))
-            m.c_list.add(m.y[i] == (1 - sigma) * self.f1(x) + sigma * self.f2(x))
+            m.y = pe.Var(range(n_points), initialize=init_y)
 
-        sigma = 1.0 / (1 + pe.exp(-m.k * self._band * self._b))
-        m.smooth = pe.Constraint(expr=0.05 + m.s == sigma * (1 - sigma))
+            m.c_list = pe.ConstraintList()
+            for i, x in enumerate(data_p):
+                sigma = 1.0 / (1 + pe.exp(-m.k * (x - self._b)))
+                m.c_list.add(m.y[i] == (1 - sigma) * self.f1(x) + sigma * self.f2(x))
 
-        m.obj = pe.Objective(expr=sum((m.y[i] - sampled[i]) ** 2 for i in range(n_points)) + m.s**2, sense=pe.minimize)
+            sigma = 1.0 / (1 + pe.exp(-m.k * self._band * self._b))
+            m.smooth = pe.Constraint(expr=0.05 + m.s == sigma * (1 - sigma))
 
-        opt = pe.SolverFactory('ipopt')
-        opt.solve(m, tee=tee)
-        self._k = pe.value(m.k)
+            m.obj = pe.Objective(expr=sum((m.y[i] - sampled[i]) ** 2 for i in range(n_points)) + m.s**2, sense=pe.minimize)
+
+            opt = pe.SolverFactory('ipopt')
+            opt.solve(m, tee=tee)
+            self._k = pe.value(m.k)
+        else:
+            self._k = 1.0
 
     def __call__(self, *args, **kwargs):
         x = args[0]
@@ -90,7 +95,7 @@ class SmoothNamedFunction(object):
         self._n_points = 50
         self._start = start
         self._end = end
-        self._band = 0.02
+        self._band = 0.05
         self._k = 1.0
         self._name = name
 
@@ -114,31 +119,36 @@ class SmoothNamedFunction(object):
         n_points = self._n_points
 
         start = self._start + 0.6*(self._b-self._start)
-        end = start = self._b + 0.4*(self._end-self._b)
+        end  = self._b + 0.4*(self._end-self._b)
         data_p = np.linspace(start,
                              end,
                              n_points)
 
-        sampled = list(map(self.discontinuous_f, data_p))
+        difference = sum(abs(self.f1(p) - self.f2(p)) for p in data_p)
+        if difference > 0:
 
-        def init_y(m, i):
-            return sampled[i]
+            sampled = list(map(self.discontinuous_f, data_p))
 
-        m.y = pe.Var(range(n_points), initialize=init_y)
+            def init_y(m, i):
+                return sampled[i]
 
-        m.c_list = pe.ConstraintList()
-        for i, x in enumerate(data_p):
-            sigma = 1.0 / (1 + pe.exp(-m.k * (x - self._b)))
-            m.c_list.add(m.y[i] == (1 - sigma) * self.f1(x) + sigma * self.f2(x))
+            m.y = pe.Var(range(n_points), initialize=init_y)
 
-        sigma = 1.0 / (1 + pe.exp(-m.k * self._band * self._b))
-        m.smooth = pe.Constraint(expr=0.05 + m.s == sigma * (1 - sigma))
+            m.c_list = pe.ConstraintList()
+            for i, x in enumerate(data_p):
+                sigma = 1.0 / (1 + pe.exp(-m.k * (x - self._b)))
+                m.c_list.add(m.y[i] == (1 - sigma) * self.f1(x) + sigma * self.f2(x))
 
-        m.obj = pe.Objective(expr=sum((m.y[i] - sampled[i]) ** 2 for i in range(n_points)) + m.s**2, sense=pe.minimize)
+            sigma = 1.0 / (1 + pe.exp(-m.k * self._band * self._b))
+            m.smooth = pe.Constraint(expr=0.05 + m.s == sigma * (1 - sigma))
 
-        opt = pe.SolverFactory('ipopt')
-        opt.solve(m, tee=tee)
-        self._k = pe.value(m.k)
+            m.obj = pe.Objective(expr=sum((m.y[i] - sampled[i]) ** 2 for i in range(n_points)) + m.s**2, sense=pe.minimize)
+
+            opt = pe.SolverFactory('ipopt')
+            opt.solve(m, tee=tee)
+            self._k = pe.value(m.k)
+        else:
+            self._k = 1.0
 
     def __call__(self, *args, **kwargs):
         name = args[0]

@@ -99,7 +99,7 @@ class PyomoModeler(object):
 
         # Discretize using Finite elements and collocation
         discretizer = pe.TransformationFactory('dae.collocation')
-        discretizer.apply_to(m, nfe=60, ncp=2, wrt=m.t)
+        discretizer.apply_to(m, nfe=60, ncp=1, wrt=m.t)
 
     def initialize_variables(self, trajectories=None):
         self.pyomo_column.initialize_variables(trajectories=trajectories)
