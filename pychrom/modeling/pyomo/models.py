@@ -1,8 +1,8 @@
 from pychrom.modeling.pyomo.var import define_C_vars, define_Q_vars, define_free_sites_vars
-from pychrom.utils.smoothing import PieceWiseNamedFunction, smooth_named_functions
+from pychrom.modeling.pyomo.smoothing import PieceWiseNamedFunction, smooth_named_functions
 from pychrom.core.binding_model import SMABinding
 from pychrom.modeling.results_object import ResultsDataSet
-from pychrom.utils.discretization import *
+from pychrom.modeling.pyomo.discretization import backward_dcdx, backward_dcdx2
 import pyomo.environ as pe
 import pyomo.dae as dae
 import xarray as xr
@@ -12,6 +12,7 @@ import abc
 
 
 logger = logging.getLogger(__name__)
+
 
 class PyomoColumn(abc.ABC):
 
@@ -119,6 +120,7 @@ class PyomoColumn(abc.ABC):
         """
         return self.m
 
+
 class ConvectionModel(PyomoColumn):
 
     def __init__(self, column):
@@ -180,7 +182,7 @@ class ConvectionModel(PyomoColumn):
 
         # mobile phase mass balance
         def rule_mass_balance(m, s, t, x):
-            if x == m.x.bounds()[0] or t == m.t.bounds()[0]:
+            if x == m.x.first() or t == m.t.first():
                 return pe.Constraint.Skip
             lhs = m.dCdt[s, t, x]
             rhs = -self._column.velocity*m.dCdx[s, t, x]
@@ -215,10 +217,10 @@ class ConvectionModel(PyomoColumn):
         """
 
         inlet_functions = self.create_inlet_functions()
-        lin = self.m.x.bounds()[0]
+        lin = self.m.x.first()
 
         def rule_inlet_bc(m, s, tt):
-            if tt == m.t.bounds()[0]:
+            if tt == m.t.first():
                 return pe.Constraint.Skip
             lhs = m.C[s, tt, lin]
             rhs = inlet_functions[s](s, tt)
@@ -234,7 +236,7 @@ class ConvectionModel(PyomoColumn):
         :return: None
         """
 
-        t0 = self.m.t.bounds()[0]
+        t0 = self.m.t.first()
 
         def rule_init_c(m, s, x):
             return m.C[s, t0, x] == self._column.init_c(s)
@@ -280,7 +282,7 @@ class ConvectionModel(PyomoColumn):
                 for t in self.m.t:
                     for x in self.m.x:
                         # if the variable was not scale sc will be 1.0
-                        if x == self.m.x.bounds()[0]:
+                        if x == self.m.x.first():
                             pyomo_c_var[s, t, x].value = inlet_functions[s](s, t)
                         else:
                             pyomo_c_var[s, t, x].value = self._column.init_c(s) / pe.value(self.m.sc[s])
@@ -326,6 +328,7 @@ class ConvectionModel(PyomoColumn):
                                           'col_loc'])
         return result_set
 
+
 class DispersionModel(ConvectionModel):
 
     def __init__(self, column):
@@ -362,16 +365,16 @@ class DispersionModel(ConvectionModel):
 
         def rule_mass_balance(m, s, t, x):
 
-            if x == m.x.bounds()[0]:
+            if x == m.x.first():
                 return pe.Constraint.Skip
-            if x == m.x.bounds()[1]:
+            if x == m.x.last():
                 return pe.Constraint.Skip
-            if t == m.t.bounds()[0]:
+            if t == m.t.first():
                 return pe.Constraint.Skip
 
             x_list = sorted(m.x)
             lhs = m.dCdt[s, t, x]
-            rhs = -u*m.dCdx[s, t, x] + diff*backward_dcdx2(m.C, s, t, x, x_list)
+            rhs = -u*m.dCdx[s, t, x] + diff*backward_dcdx2(m, s, t, x, x_list)
             return lhs == rhs
 
         self.m.mass_balance_mobile = pe.Constraint(self.m.s, self.m.t, self.m.x, rule=rule_mass_balance)
@@ -402,8 +405,8 @@ class DispersionModel(ConvectionModel):
         super().build_boundary_conditions(**kwargs)
 
         def rule_outlet_bc(m, s, t):
-            lout = m.x.bounds()[1]
-            if t == m.t.bounds()[0]:
+            lout = m.x.last()
+            if t == m.t.first():
                 return pe.Constraint.Skip
             lhs = m.dCdx[s, t, lout]
             rhs = 0.0
@@ -427,6 +430,7 @@ class DispersionModel(ConvectionModel):
 
         result_set = super().store_values_in_data_set()
         return result_set
+
 
 class IdealConvectiveColumn(ConvectionModel):
 
@@ -465,15 +469,15 @@ class IdealConvectiveColumn(ConvectionModel):
         :return: None
         """
 
-        F = (1.0 - self._column.column_porosity) / self._column.column_porosity
+        F =  (1.0 - self._column.column_porosity) / self._column.column_porosity
         u = self._column.velocity
 
         # mobile phase mass balance
         def rule_mass_balance(m, s, t, x):
 
-            if x == m.x.bounds()[0]:
+            if x == m.x.first():
                 return pe.Constraint.Skip
-            if t == m.t.bounds()[0]:
+            if t == m.t.first():
                 return pe.Constraint.Skip
 
             lhs = m.dCdt[s, t, x]
@@ -508,7 +512,7 @@ class IdealConvectiveColumn(ConvectionModel):
         salt_scale = self.m.sq[salt_name]
 
         def rule_adsorption(m, s, t, x):
-            if t == 0:
+            if t == m.t.first():
                 return pe.Constraint.Skip
 
             c_var = dict()
@@ -519,13 +523,13 @@ class IdealConvectiveColumn(ConvectionModel):
 
             if self._column.is_salt(s):
                 lhs = self.m.Q[s, t, x]
-                rhs = binding.f_ads(s, c_var, q_var)
+                rhs = binding.f_ads2(s, c_var, q_var)
             else:
                 if binding.is_kinetic:
                     lhs = self.m.dQdt[s, t, x]
                 else:
                     lhs = 0.0
-                rhs = binding.f_ads(s, c_var, q_var, q_ref=salt_scale)
+                rhs = binding.f_ads2(s, c_var, q_var)
 
             return lhs == rhs
 
@@ -537,7 +541,7 @@ class IdealConvectiveColumn(ConvectionModel):
         salt_name = self._column.salt
 
         def rule_adsorption(m, s, t, x):
-            if t == m.t.bounds()[0]:
+            if t == m.t.first():
                 return pe.Constraint.Skip
 
             c_var = dict()
@@ -643,6 +647,7 @@ class IdealConvectiveColumn(ConvectionModel):
 
         return result_set
 
+
 class IdealDispersiveColumn(DispersionModel):
 
     def __init__(self, column):
@@ -688,16 +693,16 @@ class IdealDispersiveColumn(DispersionModel):
 
         def rule_mass_balance(m, s, t, x):
 
-            if x == m.x.bounds()[0]:
+            if x == m.x.first():
                 return pe.Constraint.Skip
-            if x == m.x.bounds()[1]:
+            if x == m.x.last():
                 return pe.Constraint.Skip
-            if t == m.t.bounds()[0]:
+            if t == m.t.first():
                 return pe.Constraint.Skip
 
             x_list = sorted(m.x)
             lhs = m.dCdt[s, t, x]
-            rhs = -u*m.dCdx[s, t, x] - F * self.m.dQdt[s, t, x] + diff*backward_dcdx2(m.C, s, t, x, x_list)
+            rhs = -u*m.dCdx[s, t, x] - F * self.m.dQdt[s, t, x] + diff*backward_dcdx2(m, s, t, x, x_list)
             return lhs == rhs
 
         self.m.mass_balance_mobile = pe.Constraint(self.m.s,
@@ -757,7 +762,7 @@ class IdealDispersiveColumn(DispersionModel):
         salt_name = self._column.salt
 
         def rule_adsorption(m, s, t, x):
-            if t == m.t.bounds()[0]:
+            if t == m.t.first():
                 return pe.Constraint.Skip
 
             c_var = dict()

@@ -154,21 +154,10 @@ class SMABinding(BindingModel):
         :param comp_name: name of component of interest
         :param c_vars: dictionary from comp_id to variable. Either value or pyomo variable
         :param q_vars: dictionary from comp_id to variable. Either value or pyomo variable
-        :param unfix_params: dictionary from parameter name to variable. Either value or pyomo variable
         :return: expression if pyomo variable or scalar value
         """
         self._check_model()
         q_ref = kwargs.pop('q_ref', 1.0)
-
-        unfixed_index_params = kwargs.pop('unfixed_index_params', None)
-        unfixed_scalar_params = kwargs.pop('unfixed_scalar_params', None)
-        scale_vars = kwargs.pop('scale_vars', None)
-
-        if unfixed_index_params is not None or unfixed_scalar_params is not None:
-            raise NotImplementedError()
-
-        if scale_vars is not None:
-            raise NotImplementedError()
 
         if not self.is_fully_specified():
             print(self.get_index_parameters())
@@ -199,8 +188,8 @@ class SMABinding(BindingModel):
             q_0_bar -= sj*q_vars[cname]
 
         # scale q_0_bar
-        #gamma_0_bar = q_0_bar*q_ref
-        gamma_0_bar = q_0_bar
+        gamma_0_bar = q_0_bar*q_ref
+        #gamma_0_bar = q_0_bar
         # adsorption term
         kads = self.kads(comp_name)
         vi = self.nu(comp_name)
@@ -211,6 +200,46 @@ class SMABinding(BindingModel):
         desorption = kdes * q_vars[comp_name] * (c_vars[salt_name]) ** vi
 
         return adsorption-desorption
+
+    def f_ads2(self, comp_name, c_vars, q_vars, **kwargs):
+        self._check_model()
+        q_ref = kwargs.pop('q_ref', 1.0)
+
+        if not self.is_fully_specified():
+            print(self.get_index_parameters())
+            raise RuntimeError("Missing parameters")
+
+        _scalar_params = self.get_scalar_parameters(with_defaults=True)
+
+        assert self._model().salt is not None, "Salt must be defined in chromatography model"
+
+        # get list components
+        components = self._model().list_components()
+        # determine if salt
+        is_salt = self._model().is_salt(comp_name)
+        salt_name = self._model().salt
+
+        loop_nosalt = [n for n in components if n != salt_name]
+        q_0 = _scalar_params['sma_lambda']
+
+        # compute free salt
+        for cname in loop_nosalt:
+            vj = self.nu(cname)
+            sj = self.sigma(cname)
+            q_0 -= (vj+sj)*q_vars[cname]
+        if comp_name == salt_name:
+            return q_0
+
+        kads = self.kads(comp_name)
+        vi = self.nu(comp_name)
+        adsorption = kads * c_vars[comp_name] * (q_vars[salt_name]) ** vi
+
+        # desorption term
+        kdes = self.kdes(comp_name)
+        desorption = kdes * q_vars[comp_name] * (c_vars[salt_name]) ** vi
+
+        return adsorption - desorption
+
 
     def f_ads_given_free_sites(self, comp_name, c_vars, q_vars, free_sites_var, **kwargs):
         """

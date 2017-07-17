@@ -1,4 +1,5 @@
 from pychrom.modeling.casadi.models import ConvectionModel, DispersionModel
+from pychrom.modeling.casadi.models import IdealConvectiveColumn
 from pychrom.core.unit_operation import Column
 import casadi as ca
 import warnings
@@ -48,6 +49,11 @@ class CasadiModeler(object):
             self.casadi_column = DispersionModel(self._column)
             self.casadi_column.build_model(lspan, rspan=None, **options)
             self._parameters = [self._column.velocity, self._column.dispersion]
+        elif model_type == 'IdealConvectiveColumn':
+            self.casadi_column = IdealConvectiveColumn(self._column)
+            self.casadi_column.build_model(lspan, rspan=None, **options)
+            self._parameters = [self._column.velocity, 0.0]
+
         else:
             raise NotImplementedError("Model not supported yet")
 
@@ -57,7 +63,9 @@ class CasadiModeler(object):
         print(m.algebraics)
         print(m.parameters)
         print(m.ode)
-        #print(m.alg_eq)
+        print(m.alg_eq)
+        print(len(m.algebraics), len(m.alg_eq))
+        print(len(m.states), len(m.ode))
         """
 
     def run_sim(self, tspan):

@@ -46,6 +46,11 @@ GRM.binding.is_kinetic = False
 # create column
 GRM.column = Column(data="column.yml")
 
+
+for name in GRM.list_components():
+    nu = 1.0
+    GRM.column.binding_model.set_nu(name, nu)
+
 # create outlet
 GRM.outlet = Outlet(components=comps)
 
@@ -58,7 +63,8 @@ modeler = CasadiModeler(GRM)
 lspan = np.linspace(0, GRM.column.length, 50)
 
 #modeler.build_model(lspan, model_type='ConvectionModel')
-modeler.build_model(lspan, model_type='DispersionModel')
+#modeler.build_model(lspan, model_type='DispersionModel')
+modeler.build_model(lspan, model_type='IdealConvectiveColumn')
 
 
 #sys.exit()

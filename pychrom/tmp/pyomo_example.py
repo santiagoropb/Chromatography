@@ -68,7 +68,6 @@ for t in np.linspace(9.0, 11.0, 10):
     tspan.append(t)
 
 for name in GRM.list_components():
-    #nu = round(GRM.column.binding_model.nu(name))
     nu = 3.0
     GRM.column.binding_model.set_nu(name, nu)
 

@@ -1,6 +1,7 @@
 from pychrom.modeling.casadi.discretization import backward_dcdx, backward_dcdx2
 from pychrom.modeling.casadi.smoothing import smooth_named_functions
 from pychrom.modeling.results_object import ResultsDataSet
+from pychrom.core.binding_model import SMABinding
 import casadi as ca
 import numpy as np
 import xarray as xr
@@ -42,6 +43,21 @@ class CasadiModel(object):
         self.alg_eq = None
         self.init_conditions = None
         self.parameters = None
+        self.q_expressions = None
+
+        # for easier ordering
+        self.c_states = None
+        self.c_algebraics = None
+        self.c_ode = None
+        self.c_alg_eq = None
+        self.c_init_conditions = None
+
+        # for easier ordering
+        self.q_states = None
+        self.q_algebraics = None
+        self.q_ode = None
+        self.q_alg_eq = None
+        self.q_init_conditions = None
 
 
 class CasadiColumn(object):
@@ -113,18 +129,28 @@ class CasadiColumn(object):
 
         # defines container for states
         self.m.states = []
+        self.m.c_states = []
+        self.m.q_states = []
 
         # defines container for algebraics
         self.m.algebraics = []
+        self.m.c_algebraics = []
+        self.m.q_algebraics = []
 
         # defines container for odes
         self.m.ode = []
+        self.m.c_ode = []
+        self.m.q_ode = []
 
         # defines container for algebraic equations
         self.m.alg_eq = []
+        self.m.c_alg_eq = []
+        self.m.q_alg_eq = []
 
         # defines container with initial conditions
         self.m.init_conditions = []
+        self.m.c_init_conditions = []
+        self.m.q_init_conditions = []
 
         # defines container with parameters
         self.parameters = []
@@ -218,7 +244,7 @@ class CasadiColumn(object):
 
         return section_functions
 
-    def build_model(self, lspan=None, rspan=None, **kwargs):
+    def build_model(self, lspan, rspan=None, **kwargs):
         """
 
         :return:
@@ -228,10 +254,10 @@ class CasadiColumn(object):
         # create variables
         self.build_variables(**kwargs)
         # create constraints
-        self.build_mobile_phase_balance(**kwargs)
-        self.build_stationary_phase_balance(**kwargs)
-        self.build_adsorption_equations(**kwargs)
         self.build_boundary_conditions(**kwargs)
+        self.build_mobile_phase_balance(**kwargs)
+        self.build_adsorption_equations(**kwargs)
+        self.build_stationary_phase_balance(**kwargs)
         self.build_initial_conditions(**kwargs)
 
     def model(self):
@@ -271,10 +297,10 @@ class ConvectionModel(CasadiColumn):
 
         for i in range(1, self.m.nx):
             for j in range(self.m.ns):
-                self.m.states.append(self.m.C[j, i])
+                self.m.c_states.append(self.m.C[j, i])
 
         for j in range(self.m.ns):
-            self.m.algebraics.append(self.m.C[j, 0])
+            self.m.c_algebraics.append(self.m.C[j, 0])
 
     def build_mobile_phase_balance(self, **kwargs):
         """
@@ -286,7 +312,7 @@ class ConvectionModel(CasadiColumn):
             if j > 0:
                 for s in self.m.s:
                     expr = -self.m.v * backward_dcdx(self.m, s, x)
-                    self.m.ode.append(expr)
+                    self.m.c_ode.append(expr)
 
     def build_stationary_phase_balance(self, **kwargs):
         """
@@ -311,7 +337,7 @@ class ConvectionModel(CasadiColumn):
 
         for i, s in enumerate(self.m.s):
             expr = inlet_functions[s](s, self.m.t)
-            self.m.alg_eq.append(self.m.C[i, 0]-expr)
+            self.m.c_alg_eq.append(self.m.C[i, 0]-expr)
 
     def initialize_variables(self, trajectories=None):
         """
@@ -329,7 +355,7 @@ class ConvectionModel(CasadiColumn):
         for i in range(1, self.m.nx):
             for s in self.m.s:
                 ic = self._column.init_c(s)
-                self.m.init_conditions.append(ic)
+                self.m.c_init_conditions.append(ic)
 
     def store_values_in_data_set(self, solution):
         """
@@ -364,6 +390,29 @@ class ConvectionModel(CasadiColumn):
                                     dims=['component', 'time', 'location'])
         return result_set
 
+    def build_model(self, lspan, rspan=None, **kwargs):
+        """
+
+        :return:
+        """
+        super().build_model(lspan)
+
+        # concatenate state variables
+        for e in self.m.c_states:
+            self.m.states.append(e)
+
+        # concatenate algebraic variables
+        for e in self.m.c_algebraics:
+            self.m.algebraics.append(e)
+
+        # concatenate odes
+        for e in self.m.c_ode:
+            self.m.ode.append(e)
+
+        # concatenate algebraic equations
+        for e in self.m.c_alg_eq:
+            self.m.alg_eq.append(e)
+
 
 class DispersionModel(CasadiColumn):
 
@@ -394,13 +443,13 @@ class DispersionModel(CasadiColumn):
 
         for i in range(1, self.m.nx-1):
             for j in range(self.m.ns):
-                self.m.states.append(self.m.C[j, i])
+                self.m.c_states.append(self.m.C[j, i])
 
         for j in range(self.m.ns):
-            self.m.algebraics.append(self.m.C[j, 0])
+            self.m.c_algebraics.append(self.m.C[j, 0])
 
         for j in range(self.m.ns):
-            self.m.algebraics.append(self.m.C[j, self.m.nx-1])
+            self.m.c_algebraics.append(self.m.C[j, self.m.nx-1])
 
     def build_mobile_phase_balance(self, **kwargs):
         """
@@ -415,7 +464,7 @@ class DispersionModel(CasadiColumn):
                         expr = -self.m.v * backward_dcdx(self.m, s, x) + self.m.diff*backward_dcdx2(self.m, s, x)
                     else:
                         expr = -self.m.v * backward_dcdx(self.m, s, x)
-                    self.m.ode.append(expr)
+                    self.m.c_ode.append(expr)
 
     def build_stationary_phase_balance(self, **kwargs):
         """
@@ -440,11 +489,11 @@ class DispersionModel(CasadiColumn):
 
         for i, s in enumerate(self.m.s):
             expr = inlet_functions[s](s, self.m.t)
-            self.m.alg_eq.append(self.m.C[i, 0]-expr)
+            self.m.c_alg_eq.append(self.m.C[i, 0]-expr)
 
         last_x = self.m.x[-1]
         for i, s in enumerate(self.m.s):
-            self.m.alg_eq.append(backward_dcdx(self.m, s, last_x))
+            self.m.c_alg_eq.append(backward_dcdx(self.m, s, last_x))
 
     def initialize_variables(self, trajectories=None):
         """
@@ -462,7 +511,7 @@ class DispersionModel(CasadiColumn):
         for i in range(1, self.m.nx-1):
             for s in self.m.s:
                 ic = self._column.init_c(s)
-                self.m.init_conditions.append(ic)
+                self.m.c_init_conditions.append(ic)
 
     def store_values_in_data_set(self, solution):
         """
@@ -501,4 +550,268 @@ class DispersionModel(CasadiColumn):
                                     dims=['component', 'time', 'location'])
         return result_set
 
+    def build_model(self, lspan, rspan=None, **kwargs):
+        """
 
+        :return:
+        """
+        super().build_model(lspan)
+
+        # concatenate state variables
+        for e in self.m.c_states:
+            self.m.states.append(e)
+
+        # concatenate algebraic variables
+        for e in self.m.c_algebraics:
+            self.m.algebraics.append(e)
+
+        # concatenate odes
+        for e in self.m.c_ode:
+            self.m.ode.append(e)
+
+        # concatenate algebraic equations
+        for e in self.m.c_alg_eq:
+            self.m.alg_eq.append(e)
+
+
+class IdealConvectiveColumn(ConvectionModel):
+
+    def __init__(self, column):
+        super().__init__(column)
+
+    def setup_base(self, lspan, rspan=None, **kwargs):
+        """
+        Creates base sets and params for modeling a chromatography column with casadi
+        :param tspan:
+        :param lspan:
+        :param rspan:
+        :return: None
+        """
+
+        super().setup_base(lspan, rspan, **kwargs)
+
+    def build_variables(self, **kwargs):
+        """
+        Create variables for modeling chromatography column with pyomo
+        :return: None
+        """
+
+        super().build_variables(**kwargs)
+
+        # concentration variable
+        self.m.Q = ca.SX.sym("Q", self.m.ns, self.m.nx)
+
+        salt_name = self._column.salt
+
+        if salt_name is None:
+            salt_name = ''
+
+        s_no_salt = [s for s in self.m.s if s != salt_name]
+        if self._column.binding_model.is_kinetic:
+            # define states for all components that are not salt
+            for i in range(self.m.nx):
+                for s in s_no_salt:
+                    j = self.m.s_to_id[s]
+                    self.m.q_states.append(self.m.Q[j, i])
+
+            # define algebraic for salt component
+            if salt_name != '':
+                j = self.m.s_to_id[salt_name]
+                for i in range(self.m.nx):
+                    self.m.q_algebraics.append(self.m.Q[j, i])
+        else:
+            # define algebraic for all components
+            for i in range(self.m.nx):
+                for j in range(self.m.ns):
+                    self.m.q_algebraics.append(self.m.Q[j, i])
+
+
+    def build_mobile_phase_balance(self, **kwargs):
+        """
+        Creates PDEs for mobile phase mass balance for modeling chromatography column with casadi
+        :return: boolean
+        """
+
+        is_kinetic = self._column.binding_model.is_kinetic
+        if is_kinetic:
+            for j, x in enumerate(self.m.x):
+                if j > 0:
+                    for k, s in enumerate(self.m.s):
+                        expr = -self.m.v * backward_dcdx(self.m, s, x)
+                        self.m.c_ode.append(expr)
+        else:
+            for j, x in enumerate(self.m.x):
+                if j > 0:
+                    for k, s in enumerate(self.m.s):
+                        expr = -self.m.v * backward_dcdx(self.m, s, x)
+                        self.m.c_ode.append(expr)
+
+    def build_stationary_phase_balance(self, **kwargs):
+        """
+        Creates PDEs for stationary phase mass balance for modeling chromatography column with casadi
+        :return: boolean
+        """
+        pass
+
+    def build_adsorption_equations(self, **kwargs):
+        """
+        Creates PDEs for stationary phase mass balance for modeling chromatography column with casadi
+        :return: boolean
+        """
+        bm = self._column.binding_model
+        is_kinetic = bm.is_kinetic
+        salt_name = self._column.salt
+        if salt_name is None:
+            salt_name = ''
+
+        self.m.q_expressions = dict()
+        for i in range(self.m.nx):
+            c_var = dict()
+            q_var = dict()
+            for k, s in enumerate(self.m.s):
+                c_var[s] = self.m.C[k, i]
+                q_var[s] = self.m.Q[k, i]
+
+            for k, s in enumerate(self.m.s):
+                expr = bm.f_ads2(s, c_var, q_var)
+                self.m.q_expressions[k, i] = expr
+
+        s_no_salt = [s for s in self.m.s if s != salt_name]
+        if is_kinetic:
+            for i in range(self.m.nx):
+                for s in s_no_salt:
+                    k = self.m.s_to_id[s]
+                    expr = self.m.q_expressions[k, i]
+                    self.m.q_ode.append(expr)
+            if salt_name != '':
+                k = self.m.s_to_id[salt_name]
+                for i in range(self.m.nx):
+                    expr = self.m.q_expressions[k, i]
+                    self.m.q_alg_eq.append(expr)
+        else:
+            for i in range(self.m.nx):
+                for k, s in enumerate(self.m.s):
+                    expr = self.m.q_expressions[k, i]
+                    self.m.q_alg_eq.append(expr)
+
+    def build_boundary_conditions(self, **kwargs):
+        """
+        Creates expressions for boundary conditions
+        :return: None
+        """
+        #super().build_boundary_conditions(**kwargs)
+
+        inlet_functions = self.create_inlet_functions()
+
+        for i, s in enumerate(self.m.s):
+            expr = inlet_functions[s](s, self.m.t)
+            self.m.c_alg_eq.append(self.m.C[i, 0] - 1.0)
+
+    def initialize_variables(self, trajectories=None):
+        """
+
+        :param trajectories: results set
+        :return:
+        """
+        pass
+
+    def build_initial_conditions(self, **kwargs):
+        """
+        Creates expressions for boundary conditions
+        :return: None
+        """
+        super().build_initial_conditions(**kwargs)
+
+        bm = self._column.binding_model
+        is_kinetic = bm.is_kinetic
+        salt_name = self._column.salt
+        if salt_name is None:
+            salt_name = ''
+
+        s_no_salt = [s for s in self.m.s if s != salt_name]
+        if is_kinetic:
+            for i in range(self.m.nx):
+                for s in s_no_salt:
+                    ic = self._column.init_q(s)
+                    self.m.q_init_conditions.append(ic)
+
+    def store_values_in_data_set(self, solution):
+        """
+        store variable values in results object
+        :return: ResultsDataSet
+        """
+
+        # loading solution to x array
+        nt = len(self.m.grid_t)
+        nx = self.m.nx
+        ns = self.m.ns
+
+        result_set = ResultsDataSet()
+        result_set.components = np.array(self.m.s)
+        result_set.times = np.array(self.m.grid_t)
+        result_set.col_locs = np.array(self.m.x)
+
+        conc = np.zeros((ns, nt, nx))
+
+        for j, t in enumerate(self.m.grid_t):
+            for k, x in enumerate(self.m.x):
+                for w, s in enumerate(self.m.s):
+                    if k > 0:
+                        conc[w, j, k] = solution['xf'][(k*ns+w) - ns, j]
+
+        for j, t in enumerate(self.m.grid_t):
+            for w, s in enumerate(self.m.s):
+                conc[w, j, 0] = solution['zf'][w, j]
+
+        result_set.C = xr.DataArray(conc,
+                                    coords=[self.m.s, self.m.grid_t, self.m.x],
+                                    dims=['component', 'time', 'location'])
+        return result_set
+
+    def build_model(self, lspan, rspan=None, **kwargs):
+        """
+
+        :return:
+        """
+        super().build_model(lspan)
+
+
+        # concatenate state variables
+        for e in self.m.q_states:
+            self.m.states.append(e)
+
+        # concatenate algebraic variables
+        for e in self.m.q_algebraics:
+            self.m.algebraics.append(e)
+
+        # concatenate odes
+        for e in self.m.q_ode:
+            self.m.ode.append(e)
+
+        # concatenate algebraic equations
+        for e in self.m.q_alg_eq:
+            self.m.alg_eq.append(e)
+
+        m = self.m
+
+        print("concentration variables and equations")
+        print(len(m.c_states), len(m.c_ode))
+        for i, v in enumerate(m.c_states):
+            e = m.c_ode[i]
+            print(v, e, sep="\t")
+
+        print(len(m.c_algebraics), len(m.c_alg_eq))
+        for i, v in enumerate(m.c_algebraics):
+            e = m.c_alg_eq[i]
+            print(v, e, sep="\t")
+
+        print("q variables and equations")
+        print(len(m.q_states), len(m.q_ode))
+        for i, v in enumerate(m.q_states):
+            e = m.q_ode[i]
+            print(v, e, sep="\t")
+
+        print(len(m.q_algebraics), len(m.q_alg_eq))
+        for i, v in enumerate(m.q_algebraics):
+            e = m.q_alg_eq[i]
+            print(v, e, sep="\t")
