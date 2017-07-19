@@ -161,8 +161,12 @@ class ConvectionModel(PyomoColumn):
         self.m.sq = pe.Param(self.m.s, initialize=1.0, mutable=True)
 
         # for SMA scaling
-        lamda = self._column.binding_model.lamda
-        self.m.sf = pe.Param(initialize=lamda, mutable=True)
+        bm = self._column.binding_model
+        if isinstance(bm, SMABinding):
+            lamda = self._column.binding_model.lamda
+            self.m.sf = pe.Param(initialize=lamda, mutable=True)
+        else:
+            self.m.sf = pe.Param(initialize=1.0, mutable=True)
 
     def build_variables(self, **kwargs):
         """
@@ -503,13 +507,12 @@ class IdealConvectiveColumn(ConvectionModel):
         Creates PDEs for stationary phase mass balance for modeling chromatography column with pyomo
         :return: boolean
         """
-
-        self.build_adsorption_equations2(**kwargs)
-        return True
+        bm = self._column.binding_model
+        if isinstance(bm, SMABinding):
+            self.build_adsorption_equations2(**kwargs)
+            return True
 
         binding = self._column.binding_model
-        salt_name = self._column.salt
-        salt_scale = self.m.sq[salt_name]
 
         def rule_adsorption(m, s, t, x):
             if t == m.t.first():
@@ -523,13 +526,13 @@ class IdealConvectiveColumn(ConvectionModel):
 
             if self._column.is_salt(s):
                 lhs = self.m.Q[s, t, x]
-                rhs = binding.f_ads2(s, c_var, q_var)
+                rhs = binding.f_ads(s, c_var, q_var)
             else:
                 if binding.is_kinetic:
                     lhs = self.m.dQdt[s, t, x]
                 else:
                     lhs = 0.0
-                rhs = binding.f_ads2(s, c_var, q_var)
+                rhs = binding.f_ads(s, c_var, q_var)
 
             return lhs == rhs
 

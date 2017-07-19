@@ -17,6 +17,8 @@ class BindingType(Enum):
 
     STERIC_MASS_ACTION = 0
     UNDEFINED = 1
+    LINEAR = 2
+    MULTI_COMPONENT_LANGMUIR = 3
 
     def __str__(self):
         return "{}".format(self.name)
@@ -57,7 +59,7 @@ class BindingModel(DataManager, abc.ABC):
         self._check_model()
 
         if not self.is_fully_specified():
-            print(self.get_index_parameters())
+            self.is_fully_specified(print_out=True)
             raise RuntimeError("Missing parameters")
 
         with h5py.File(filename, 'a') as f:
@@ -120,6 +122,169 @@ class BindingModel(DataManager, abc.ABC):
     #    """
 
 
+@BindingModel.register
+class LinearBinding(BindingModel):
+
+    def __init__(self, data=None, **kwargs):
+        # call parent binding model constructor
+        super().__init__(data=data, **kwargs)
+
+        self._registered_scalar_parameters = \
+            Registrar.adsorption_parameters['lin']['scalar']
+
+        self._registered_index_parameters = \
+            Registrar.adsorption_parameters['lin']['index']
+
+        # set defaults
+        self._default_scalar_params = \
+            Registrar.adsorption_parameters['lin']['scalar def']
+
+        self._default_index_params = \
+            Registrar.adsorption_parameters['lin']['index def']
+
+        self._binding_type = BindingType.LINEAR
+
+    def ka(self, comp_name):
+        return self.get_index_parameter(comp_name, 'lin_ka')
+
+    def kd(self, comp_name):
+        return self.get_index_parameter(comp_name, 'lin_kd')
+
+    def set_ka(self, comp_name, value):
+        self.set_index_parameter(comp_name, 'lin_ka', value)
+
+    def set_kd(self, comp_name, value):
+        self.set_index_parameter(comp_name, 'lin_kd', value)
+
+    def _write_to_cadet_input_file(self, filename, unitname, **kwargs):
+        """
+        Append binding model to cadet hdf5 input file
+        :param filename: name of cadet hdf5 input file
+        """
+        super()._write_to_cadet_input_file(filename, unitname, **kwargs)
+        with h5py.File(filename, 'a') as f:
+            subgroup_name = os.path.join("input", "model", unitname)
+            subgroup = f[subgroup_name]
+            adsorption = subgroup['adsorption']
+
+            # scalar parameters
+            double_scalars = []
+            int_scalars = []
+
+            # index parameters
+            double_index = ['lin_ka', 'lin_kd']
+            self._cadet_writer_helper(adsorption,
+                                      int_scalars=int_scalars,
+                                      double_scalars=double_scalars,
+                                      double_index=double_index)
+
+    def f_ads(self, comp_name, c_vars, q_vars, **kwargs):
+        """
+        Computes adsorption function for component comp_id
+        :param comp_name: name of component of interest
+        :param c_vars: dictionary from comp_id to variable. Either value or pyomo variable
+        :param q_vars: dictionary from comp_id to variable. Either value or pyomo variable
+        :return: expression if pyomo variable or scalar value
+        """
+        self._check_model()
+
+        if not self.is_fully_specified():
+            print(self.get_index_parameters())
+            raise RuntimeError("Missing parameters")
+
+        ci = comp_name
+        return self.ka(ci)*c_vars[ci] - self.kd(ci)*q_vars[ci]
+
+
+@BindingModel.register
+class MCLBinding(BindingModel):
+
+    def __init__(self, data=None, **kwargs):
+        # call parent binding model constructor
+        super().__init__(data=data, **kwargs)
+
+        self._registered_scalar_parameters = \
+            Registrar.adsorption_parameters['mcl']['scalar']
+
+        self._registered_index_parameters = \
+            Registrar.adsorption_parameters['mcl']['index']
+
+        # set defaults
+        self._default_scalar_params = \
+            Registrar.adsorption_parameters['mcl']['scalar def']
+
+        self._default_index_params = \
+            Registrar.adsorption_parameters['mcl']['index def']
+
+        self._binding_type = BindingType.MULTI_COMPONENT_LANGMUIR
+
+    def ka(self, comp_name):
+        return self.get_index_parameter(comp_name, 'mcl_ka')
+
+    def kd(self, comp_name):
+        return self.get_index_parameter(comp_name, 'mcl_kd')
+
+    def q_max(self, comp_name):
+        return self.get_index_parameter(comp_name, 'mcl_qmax')
+
+    def set_ka(self, comp_name, value):
+        self.set_index_parameter(comp_name, 'mcl_ka', value)
+
+    def set_kd(self, comp_name, value):
+        self.set_index_parameter(comp_name, 'mcl_kd', value)
+
+    def set_qmax(self, comp_name, value):
+        self.set_index_parameter(comp_name, 'mcl_qmax', value)
+
+    def _write_to_cadet_input_file(self, filename, unitname, **kwargs):
+        """
+        Append binding model to cadet hdf5 input file
+        :param filename: name of cadet hdf5 input file
+        """
+        super()._write_to_cadet_input_file(filename, unitname, **kwargs)
+        with h5py.File(filename, 'a') as f:
+            subgroup_name = os.path.join("input", "model", unitname)
+            subgroup = f[subgroup_name]
+            adsorption = subgroup['adsorption']
+
+            # scalar parameters
+            double_scalars = []
+            int_scalars = []
+
+            # index parameters
+            double_index = ['mcl_ka', 'mcl_kd', 'mcl_qmax']
+            self._cadet_writer_helper(adsorption,
+                                      int_scalars=int_scalars,
+                                      double_scalars=double_scalars,
+                                      double_index=double_index)
+
+    def f_ads(self, comp_name, c_vars, q_vars, **kwargs):
+        """
+        Computes adsorption function for component comp_id
+        :param comp_name: name of component of interest
+        :param c_vars: dictionary from comp_id to variable. Either value or pyomo variable
+        :param q_vars: dictionary from comp_id to variable. Either value or pyomo variable
+        :return: expression if pyomo variable or scalar value
+        """
+        self._check_model()
+
+        if not self.is_fully_specified():
+            print(self.get_index_parameters())
+            raise RuntimeError("Missing parameters")
+
+        ci = comp_name
+        # adsorption
+        adsorption = 0.0
+        for cname in self.list_components():
+            adsorption += q_vars[cname]/self.q_max(cname)
+        adsorption = 1.0-adsorption
+        adsorption *= self.ka(ci) * c_vars[ci] * self.q_max(ci)
+
+        # desorption
+        desorption = self.kd(ci) * q_vars[ci]
+
+        return adsorption-desorption
+
 
 @BindingModel.register
 class SMABinding(BindingModel):
@@ -142,11 +307,54 @@ class SMABinding(BindingModel):
         self._default_index_params = \
             Registrar.adsorption_parameters['sma']['index def']
 
-        # reset index params container
-        self._index_params = pd.DataFrame(index=[],
-                                          columns=self._registered_index_parameters)
-
         self._binding_type = BindingType.STERIC_MASS_ACTION
+
+    def ka(self, comp_name):
+        return self.get_index_parameter(comp_name, 'sma_ka')
+
+    def kd(self, comp_name):
+        return self.get_index_parameter(comp_name, 'sma_kd')
+
+    def nu(self, comp_name):
+        return self.get_index_parameter(comp_name, 'sma_nu')
+
+    def sigma(self, comp_name):
+        return self.get_index_parameter(comp_name, 'sma_sigma')
+
+    def set_ka(self, comp_name, value):
+        self.set_index_parameter(comp_name, 'sma_ka', value)
+
+    def set_kd(self, comp_name, value):
+        self.set_index_parameter(comp_name, 'sma_kd', value)
+
+    def set_nu(self, comp_name, value):
+        self.set_index_parameter(comp_name, 'sma_nu', value)
+
+    def set_sigma(self, comp_name, value):
+        self.set_index_parameter(comp_name, 'sma_sigma', value)
+
+    def _write_to_cadet_input_file(self, filename, unitname, **kwargs):
+
+        super()._write_to_cadet_input_file(filename, unitname, **kwargs)
+
+        assert self._model().salt is not None, "Salt must be defined in chromatography model"
+
+        with h5py.File(filename, 'a') as f:
+            subgroup_name = os.path.join("input", "model", unitname)
+            subgroup = f[subgroup_name]
+            adsorption = subgroup['adsorption']
+
+            # scalar parameters
+            double_scalars = ['sma_cref', 'sma_qref']
+            int_scalars = ['sma_lambda']
+
+            # index parameters
+            double_index = ['sma_ka', 'sma_kd', 'sma_nu', 'sma_sigma']
+            self._cadet_writer_helper(adsorption,
+                                      int_scalars=int_scalars,
+                                      double_scalars=double_scalars,
+                                      double_index=double_index)
+
 
     def f_ads(self, comp_name, c_vars, q_vars, **kwargs):
         """
@@ -191,13 +399,13 @@ class SMABinding(BindingModel):
         gamma_0_bar = q_0_bar*q_ref
         #gamma_0_bar = q_0_bar
         # adsorption term
-        kads = self.kads(comp_name)
+        ka = self.ka(comp_name)
         vi = self.nu(comp_name)
-        adsorption = kads * c_vars[comp_name] * (gamma_0_bar) ** vi
+        adsorption = ka * c_vars[comp_name] * (gamma_0_bar) ** vi
 
         # desorption term
-        kdes = self.kdes(comp_name)
-        desorption = kdes * q_vars[comp_name] * (c_vars[salt_name]) ** vi
+        kd = self.kd(comp_name)
+        desorption = kd * q_vars[comp_name] * (c_vars[salt_name]) ** vi
 
         return adsorption-desorption
 
@@ -230,16 +438,15 @@ class SMABinding(BindingModel):
         if comp_name == salt_name:
             return q_0
 
-        kads = self.kads(comp_name)
+        ka = self.ka(comp_name)
         vi = self.nu(comp_name)
-        adsorption = kads * c_vars[comp_name] * (q_vars[salt_name]) ** vi
+        adsorption = ka * c_vars[comp_name] * (q_vars[salt_name]) ** vi
 
         # desorption term
-        kdes = self.kdes(comp_name)
-        desorption = kdes * q_vars[comp_name] * (c_vars[salt_name]) ** vi
+        kd = self.kd(comp_name)
+        desorption = kd * q_vars[comp_name] * (c_vars[salt_name]) ** vi
 
         return adsorption - desorption
-
 
     def f_ads_given_free_sites(self, comp_name, c_vars, q_vars, free_sites_var, **kwargs):
         """
@@ -297,61 +504,19 @@ class SMABinding(BindingModel):
         gamma_0_bar = free_sites_var
 
         # adsorption term
-        kads = self.kads(comp_name)
+        ka = self.ka(comp_name)
         vi = self.nu(comp_name)
-        adsorption = kads * c_vars[comp_name] * gamma_0_bar ** vi
+        adsorption = ka * c_vars[comp_name] * gamma_0_bar ** vi
 
         # desorption term
-        kdes = self.kdes(comp_name)
-        desorption = kdes * q_vars[comp_name] * (c_vars[salt_name]) ** vi
+        kd = self.kd(comp_name)
+        desorption = kd * q_vars[comp_name] * (c_vars[salt_name]) ** vi
 
         return adsorption - desorption
 
-    def _write_to_cadet_input_file(self, filename, unitname, **kwargs):
 
-        super()._write_to_cadet_input_file(filename, unitname, **kwargs)
 
-        assert self._model().salt is not None, "Salt must be defined in chromatography model"
 
-        with h5py.File(filename, 'a') as f:
-            subgroup_name = os.path.join("input", "model", unitname)
-            subgroup = f[subgroup_name]
-            adsorption = subgroup['adsorption']
-
-            # scalar parameters
-            double_scalars = ['sma_cref', 'sma_qref']
-            int_scalars = ['sma_lambda']
-
-            # index parameters
-            double_index = ['sma_ka', 'sma_kd', 'sma_nu', 'sma_sigma']
-            self._cadet_writer_helper(adsorption,
-                                      int_scalars=int_scalars,
-                                      double_scalars=double_scalars,
-                                      double_index=double_index)
-
-    def kads(self, comp_name):
-        return self.get_index_parameter(comp_name, 'sma_ka')
-
-    def kdes(self, comp_name):
-        return self.get_index_parameter(comp_name, 'sma_kd')
-
-    def nu(self, comp_name):
-        return self.get_index_parameter(comp_name, 'sma_nu')
-
-    def sigma(self, comp_name):
-        return self.get_index_parameter(comp_name, 'sma_sigma')
-
-    def set_kads(self, comp_name, value):
-        self.set_index_parameter(comp_name, 'sma_ka', value)
-
-    def set_kdes(self, comp_name, value):
-        self.set_index_parameter(comp_name, 'sma_kd', value)
-
-    def set_nu(self, comp_name, value):
-        self.set_index_parameter(comp_name, 'sma_nu', value)
-
-    def set_sigma(self, comp_name, value):
-        self.set_index_parameter(comp_name, 'sma_sigma', value)
 
     @property
     def lamda(self):

@@ -497,8 +497,7 @@ class ChromatographyModel(abc.ABC):
                 new_id = sorted_times.index(t)
                 sec._section_id = new_id
         else:
-            msg = "cant sort section unless they are "
-            msg += "fully specified"
+            msg = "Need to specify the times in the sections "
             raise RuntimeError(msg)
 
     def _write_to_cadet_input_file(self,

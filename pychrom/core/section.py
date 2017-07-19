@@ -34,12 +34,8 @@ class Section(DataManager):
         self._default_index_params = \
             Registrar.section_parameters['index def']
 
-        # reset index params container
-        self._index_params = pd.DataFrame(index=[],
-                                          columns=self._registered_index_parameters)
         # define unit internal id
         self._section_id = None
-
 
     @property
     def start_time_sec(self):
@@ -138,7 +134,7 @@ class Section(DataManager):
         self._check_model()
 
         if not self.is_fully_specified():
-            print(self.get_index_parameters())
+            self.is_fully_specified(print_out=True)
             raise RuntimeError("Missing parameters")
 
         with h5py.File(filename, 'a') as f:

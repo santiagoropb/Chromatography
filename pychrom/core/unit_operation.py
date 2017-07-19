@@ -228,7 +228,7 @@ class Inlet(UnitOperation):
         """
         self._check_model()
         if not self.is_fully_specified():
-            print(self.get_index_parameters())
+            self.is_fully_specified(print_out=True)
             raise RuntimeError("Missing parameters")
 
         unitname = 'unit_'+str(self._unit_id).zfill(3)
@@ -268,6 +268,7 @@ class Inlet(UnitOperation):
     def right_connection(self):
         return self._right_connection
 
+
 @UnitOperation.register
 class Column(UnitOperation):
 
@@ -305,6 +306,7 @@ class Column(UnitOperation):
         self._binding = None
 
 
+
     @property
     def dispersion(self):
         return self.get_scalar_parameter('col_dispersion')
@@ -335,7 +337,7 @@ class Column(UnitOperation):
 
     @column_porosity.setter
     def column_porosity(self, value):
-        self.set_scalar_parameter('par_porosity', value)
+        self.set_scalar_parameter('col_porosity', value)
 
     @property
     def particle_radius(self):
@@ -382,6 +384,7 @@ class Column(UnitOperation):
                         self.__class__.__name__)
                         raise RuntimeError(msg)
                 self._binding = name
+                self.set_scalar_parameter('binding',name)
             else:
                 msg = """"{} is not a binding model of 
                 the chromatogrphy model""".format(name)
@@ -390,7 +393,7 @@ class Column(UnitOperation):
             bm = name.name
             bm_ = name
             bm_components = bm_.list_components(ids=True)
-            if bm.num_components != self.num_components:
+            if bm_.num_components != self.num_components:
                 msg = """ The binding model does not
                                 have the same number of components
                                 as the {}
@@ -406,6 +409,7 @@ class Column(UnitOperation):
 
             if hasattr(self._model(), bm):
                 self._binding = bm
+                self.set_scalar_parameter('binding', bm)
             else:
                 msg = """"{} is not a binding model of 
                 the chromatogrphy model""".format(bm)
@@ -445,7 +449,7 @@ class Column(UnitOperation):
             if not self.is_connected():
                 if print_out:
                     msg = "{} {} is not fully specified ".format(self.__class__.__name__, self.name)
-                    msg += "it is not connected"
+                    msg += "it is not fully connected"
                     print(msg)
                 return False
 
@@ -453,21 +457,21 @@ class Column(UnitOperation):
             if k not in self.get_scalar_parameters(True).keys():
                 if print_out:
                     msg = "{} {} is not fully specified ".format(self.__class__.__name__, self.name)
-                    msg += "it is missing the scalar parameter {}".format(k)
+                    msg += "it is missing the scalar parameter <<{}>>".format(k)
                     print(msg)
                 return False
             if k != 'binding':
                 if np.isnan(self._scalar_params[k]):
                     if print_out:
                         msg = "{} {} is not fully specified ".format(self.__class__.__name__, self.name)
-                        msg += "it is missing the scalar parameter {}".format(k)
+                        msg += "it is missing the scalar parameter <<{}>>".format(k)
                         print(msg)
                     return False
             else:
                 if self._scalar_params[k] is None:
                     if print_out:
                         msg = "{} {} is not fully specified ".format(self.__class__.__name__, self.name)
-                        msg += "it is missing the scalar parameter {}".format(k)
+                        msg += "it is missing the scalar parameter <<{}>>".format(k)
                         print(msg)
                     return False
 
@@ -480,6 +484,9 @@ class Column(UnitOperation):
             if k != 'binding':
                 if self._scalar_params.get(k) is None:
                     self._scalar_params[k] = np.nan
+            else:
+                if self._scalar_params.get(k) is None:
+                    self._scalar_params[k] = None
 
         for k, v in self._default_scalar_params.items():
             if np.isnan(self._scalar_params[k]):
@@ -516,7 +523,7 @@ class Column(UnitOperation):
 
         self._check_model()
         if not self.is_fully_specified():
-            print(self.get_index_parameters())
+            self.is_fully_specified(print_out=True)
             raise RuntimeError("Missing parameters")
 
         unitname = 'unit_'+str(self._unit_id).zfill(3)
@@ -629,7 +636,7 @@ class Column(UnitOperation):
         weno_eps = kwargs.pop('weno_eps', reg_weno['weno_eps'])
         # start writing
         if not self.is_fully_specified():
-            print(self.get_index_parameters())
+            self.is_fully_specified(print_out=True)
             raise RuntimeError("Missing parameters")
 
         unitname = 'unit_' + str(self._unit_id).zfill(3)
@@ -695,7 +702,7 @@ class Column(UnitOperation):
 
         self._check_model()
         if not self.is_fully_specified():
-            print(self.get_index_parameters())
+            self.is_fully_specified(print_out=True)
             raise RuntimeError("Missing parameters")
 
         if concentrations == 'in_out':
@@ -781,6 +788,11 @@ class Column(UnitOperation):
     def right_connection(self):
         return self._right_connection
 
+    def pprint(self, indent=0):
+        t = '\t' * indent
+        print(t, "Binding model", ":\n")
+        self.binding_model.pprint(indent=indent)
+        super().pprint(indent=indent)
 
 @UnitOperation.register
 class Outlet(UnitOperation):
@@ -800,7 +812,7 @@ class Outlet(UnitOperation):
 
         self._check_model()
         if not self.is_fully_specified():
-            print(self.get_index_parameters())
+            self.is_fully_specified(print_out=True)
             raise RuntimeError("Missing parameters")
 
         unitname = 'unit_' + str(self._unit_id).zfill(3)

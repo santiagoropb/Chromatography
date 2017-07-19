@@ -200,6 +200,26 @@ class Registrar(object):
 
     for p, v in adsorption_parameters['mcl']['index def'].items():
         default_scalar_parameters[p] = v
-        
-    
+
+    ########## Multi-Component Linear
+
+    adsorption_parameters['lin'] = dict()
+    adsorption_parameters['lin']['scalar'] = set()
+    adsorption_parameters['lin']['index'] = set()
+
+    adsorption_parameters['lin']['scalar def'] = dict()
+    adsorption_parameters['lin']['index def'] = dict()
+
+    # multi-component linear adsorption
+    # no scalar parameters for multi-component linear adsorption model
+
+    # index parameters
+    adsorption_parameters['lin']['index'].add('lin_ka')
+    adsorption_parameters['lin']['index'].add('lin_kd')
+
+    for p in adsorption_parameters['lin']['index']:
+        single_index_parameters.add(p)
+
+    for p, v in adsorption_parameters['lin']['index def'].items():
+        default_scalar_parameters[p] = v
 

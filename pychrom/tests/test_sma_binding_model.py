@@ -220,21 +220,21 @@ class TestSMABindingModel(unittest.TestCase):
 
         self.m = GRModel(data=self.base_model_data)
 
-    def test_kads(self):
+    def test_ka(self):
         GRM = GRModel(data=self.base_model_data)
         GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         cname = 'ribonuclease'
         val = self.test_data['index parameters'][cname]['sma_ka']
-        self.assertEqual(bm.kads(cname), val)
+        self.assertEqual(bm.ka(cname), val)
 
-    def test_kdes(self):
+    def test_kd(self):
         GRM = GRModel(data=self.base_model_data)
         GRM.binding = SMABinding(data=self.test_data)
         bm = GRM.binding
         cname = 'salt'
         val = self.test_data['index parameters'][cname]['sma_kd']
-        self.assertEqual(bm.kdes(cname), val)
+        self.assertEqual(bm.kd(cname), val)
 
     def test_nu(self):
         GRM = GRModel(data=self.base_model_data)
@@ -295,13 +295,13 @@ class TestSMABindingModel(unittest.TestCase):
             else:
 
                 vi = self.test_data['index parameters'][cname]['sma_nu']
-                kads = self.test_data['index parameters'][cname]['sma_ka']
+                ka = self.test_data['index parameters'][cname]['sma_ka']
                 q_ref = self.test_data['scalar parameters']['sma_qref']
-                ads = kads * c_vars[cname] * (q0_bar) ** vi
+                ads = ka * c_vars[cname] * (q0_bar) ** vi
 
-                kdes = self.test_data['index parameters'][cname]['sma_kd']
+                kd = self.test_data['index parameters'][cname]['sma_kd']
                 c_ref = self.test_data['scalar parameters']['sma_cref']
-                des = kdes * q_vars[cname] * (c_vars[GRM.salt]) ** vi
+                des = kd * q_vars[cname] * (c_vars[GRM.salt]) ** vi
                 dqidt[cname] = ads - des
 
         for cname in self.comp_names:

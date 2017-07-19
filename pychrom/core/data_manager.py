@@ -309,7 +309,7 @@ class DataManager(object):
             if k not in self.get_scalar_parameters(True).keys():
                 if print_out:
                     msg = "{} {} is not fully specified ".format(self.__class__.__name__, self.name)
-                    msg+= "it is missing the scalar parameter {}".format(k)
+                    msg+= "it is missing the scalar parameter <<{}>>".format(k)
                     print(msg)
                 return False
 
@@ -317,14 +317,14 @@ class DataManager(object):
                 if np.isnan(self._scalar_params[k]):
                     if print_out:
                         msg = "{} {} is not fully specified ".format(self.__class__.__name__, self.name)
-                        msg += "it is missing the scalar parameter {}".format(k)
+                        msg += "it is missing the scalar parameter <<{}>>".format(k)
                         print(msg)
                     return False
             else:
                 if self._scalar_params[k] is None:
                     if print_out:
                         msg = "{} {} is not fully specified ".format(self.__class__.__name__, self.name)
-                        msg += "it is missing the scalar parameter {}".format(k)
+                        msg += "it is missing the scalar parameter <<{}>>".format(k)
                         print(msg)
                     return False
 
@@ -337,7 +337,7 @@ class DataManager(object):
 
     def _fill_containers(self):
 
-        # initialize containers
+        # parse data provided
         for k in self._registered_scalar_parameters:
             if self._scalar_params.get(k) is None:
                 self._scalar_params[k] = np.nan
@@ -357,6 +357,11 @@ class DataManager(object):
 
     def _initialize_containers(self):
 
+        # initialize containers
+        self._index_params = pd.DataFrame(index=[],
+                                          columns=sorted(self._registered_index_parameters))
+
+        # parse data and fill in container
         self._parse_scalar_parameters()
         self._parse_index_parameters()
         self._fill_containers()
