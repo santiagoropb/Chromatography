@@ -2,6 +2,7 @@ from pychrom.modeling.casadi.models import ConvectionModel, DispersionModel
 from pychrom.modeling.casadi.models import IdealConvectiveColumn
 from pychrom.core.unit_operation import Column
 import casadi as ca
+import numpy as np
 import warnings
 import logging
 
@@ -87,6 +88,8 @@ class CasadiModeler(object):
         opts = {'grid': m.grid_t, 'output_t0': True}
 
         integrator = ca.integrator('I', 'idas', dae, opts)
+
+        #z0 = 10*np.ones(len(m.algebraics))
 
         sol = integrator(x0=m.init_conditions, p=self._parameters)
         return self.casadi_column.store_values_in_data_set(sol)

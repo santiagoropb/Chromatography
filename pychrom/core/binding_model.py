@@ -189,7 +189,7 @@ class LinearBinding(BindingModel):
         self._check_model()
 
         if not self.is_fully_specified():
-            print(self.get_index_parameters())
+            self.is_fully_specified(print_out=True)
             raise RuntimeError("Missing parameters")
 
         ci = comp_name
@@ -355,7 +355,6 @@ class SMABinding(BindingModel):
                                       double_scalars=double_scalars,
                                       double_index=double_index)
 
-
     def f_ads(self, comp_name, c_vars, q_vars, **kwargs):
         """
         Computes adsorption function for component comp_id
@@ -368,7 +367,7 @@ class SMABinding(BindingModel):
         q_ref = kwargs.pop('q_ref', 1.0)
 
         if not self.is_fully_specified():
-            print(self.get_index_parameters())
+            self.is_fully_specified(print_out=True)
             raise RuntimeError("Missing parameters")
 
         _scalar_params = self.get_scalar_parameters(with_defaults=True)
@@ -414,7 +413,7 @@ class SMABinding(BindingModel):
         q_ref = kwargs.pop('q_ref', 1.0)
 
         if not self.is_fully_specified():
-            print(self.get_index_parameters())
+            self.is_fully_specified(print_out=True)
             raise RuntimeError("Missing parameters")
 
         _scalar_params = self.get_scalar_parameters(with_defaults=True)
@@ -513,10 +512,6 @@ class SMABinding(BindingModel):
         desorption = kd * q_vars[comp_name] * (c_vars[salt_name]) ** vi
 
         return adsorption - desorption
-
-
-
-
 
     @property
     def lamda(self):

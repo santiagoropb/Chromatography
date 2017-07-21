@@ -41,7 +41,7 @@ GRM.inlet.add_section('elute')
 # create binding
 GRM.salt = 'A'
 GRM.binding = SMABinding(data="sma.yml")
-GRM.binding.is_kinetic = False
+GRM.binding.is_kinetic = True
 
 # create column
 GRM.column = Column(data="column.yml")
@@ -60,11 +60,11 @@ GRM.connect_unit_operations('column', 'outlet')
 
 # create a modeler
 modeler = CasadiModeler(GRM)
-lspan = np.linspace(0, GRM.column.length, 50)
+lspan = np.linspace(0, GRM.column.length, 4)
 
-modeler.build_model(lspan, model_type='ConvectionModel')
+#modeler.build_model(lspan, model_type='ConvectionModel')
 #modeler.build_model(lspan, model_type='DispersionModel')
-#modeler.build_model(lspan, model_type='IdealConvectiveColumn')
+modeler.build_model(lspan, model_type='IdealConvectiveColumn')
 
 
 #sys.exit()

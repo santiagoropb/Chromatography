@@ -110,7 +110,7 @@ for cname in results.components:
     #plt.plot(plot2d.time, plot2d)
 
     plt.show()
-"""
+
 fig = plt.figure()
 ax1 = fig.add_subplot(1, 1, 1)
 textos = []
@@ -133,4 +133,4 @@ def animate(l):
 n_locations = len(results.C.coords['col_loc'])
 ani = animation.FuncAnimation(fig, animate, interval=n_locations)
 plt.show()
-"""
+

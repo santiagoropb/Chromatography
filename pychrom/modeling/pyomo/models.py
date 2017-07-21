@@ -728,15 +728,15 @@ class IdealDispersiveColumn(DispersionModel):
         :return: boolean
         """
 
-        self.build_adsorption_equations2(**kwargs)
-        return True
+        bm = self._column.binding_model
+        if isinstance(bm, SMABinding):
+            self.build_adsorption_equations2(**kwargs)
+            return True
 
         binding = self._column.binding_model
-        salt_name = self._column.salt
-        salt_scale = self.m.sq[salt_name]
 
         def rule_adsorption(m, s, t, x):
-            if t == 0:
+            if t == m.t.first():
                 return pe.Constraint.Skip
 
             c_var = dict()
@@ -753,7 +753,7 @@ class IdealDispersiveColumn(DispersionModel):
                     lhs = self.m.dQdt[s, t, x]
                 else:
                     lhs = 0.0
-                rhs = binding.f_ads(s, c_var, q_var, q_ref=salt_scale)
+                rhs = binding.f_ads(s, c_var, q_var)
 
             return lhs == rhs
 

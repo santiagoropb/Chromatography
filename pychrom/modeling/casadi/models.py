@@ -1,7 +1,7 @@
 from pychrom.modeling.casadi.discretization import backward_dcdx, backward_dcdx2
 from pychrom.modeling.casadi.smoothing import smooth_named_functions
 from pychrom.modeling.results_object import ResultsDataSet
-from pychrom.core.binding_model import SMABinding
+from pychrom.core.binding_model import SMABinding, LinearBinding
 import casadi as ca
 import numpy as np
 import xarray as xr
@@ -59,6 +59,9 @@ class CasadiModel(object):
         self.q_alg_eq = None
         self.q_init_conditions = None
 
+        # for sma
+        self.q_free_sites = None
+        self.q_free_sites_expr = None
 
 class CasadiColumn(object):
 
@@ -146,6 +149,10 @@ class CasadiColumn(object):
         self.m.alg_eq = []
         self.m.c_alg_eq = []
         self.m.q_alg_eq = []
+
+        # define containers for sma
+        self.m.q_free_sites_expr = []
+        self.m.q_free_sites = []
 
         # defines container with initial conditions
         self.m.init_conditions = []
@@ -255,8 +262,8 @@ class CasadiColumn(object):
         self.build_variables(**kwargs)
         # create constraints
         self.build_boundary_conditions(**kwargs)
-        self.build_mobile_phase_balance(**kwargs)
         self.build_adsorption_equations(**kwargs)
+        self.build_mobile_phase_balance(**kwargs)
         self.build_stationary_phase_balance(**kwargs)
         self.build_initial_conditions(**kwargs)
 
@@ -387,7 +394,7 @@ class ConvectionModel(CasadiColumn):
 
         result_set.C = xr.DataArray(conc,
                                     coords=[self.m.s, self.m.grid_t, self.m.x],
-                                    dims=['component', 'time', 'location'])
+                                    dims=['component', 'time', 'col_loc'])
         return result_set
 
     def build_model(self, lspan, rspan=None, **kwargs):
@@ -547,7 +554,7 @@ class DispersionModel(CasadiColumn):
 
         result_set.C = xr.DataArray(conc,
                                     coords=[self.m.s, self.m.grid_t, self.m.x],
-                                    dims=['component', 'time', 'location'])
+                                    dims=['component', 'time', 'col_loc'])
         return result_set
 
     def build_model(self, lspan, rspan=None, **kwargs):
@@ -578,6 +585,9 @@ class IdealConvectiveColumn(ConvectionModel):
 
     def __init__(self, column):
         super().__init__(column)
+        self.dc_dt_factor = dict()
+        self.dc_dt_rhs_addition = dict()
+        self.dq_dt_expression = dict()
 
     def setup_base(self, lspan, rspan=None, **kwargs):
         """
@@ -606,6 +616,9 @@ class IdealConvectiveColumn(ConvectionModel):
         if salt_name is None:
             salt_name = ''
 
+        if salt_name != '':
+            self.m.fs = ca.SX.sym("FS", self.m.nx)
+
         s_no_salt = [s for s in self.m.s if s != salt_name]
         if self._column.binding_model.is_kinetic:
             # define states for all components that are not salt
@@ -619,12 +632,17 @@ class IdealConvectiveColumn(ConvectionModel):
                 j = self.m.s_to_id[salt_name]
                 for i in range(self.m.nx):
                     self.m.q_algebraics.append(self.m.Q[j, i])
+                    self.m.q_free_sites.append(self.m.fs[i])
+
         else:
             # define algebraic for all components
             for i in range(self.m.nx):
                 for j in range(self.m.ns):
                     self.m.q_algebraics.append(self.m.Q[j, i])
 
+            if salt_name != '':
+                for i in range(self.m.nx):
+                    self.m.q_free_sites.append(self.m.fs[i])
 
     def build_mobile_phase_balance(self, **kwargs):
         """
@@ -632,18 +650,21 @@ class IdealConvectiveColumn(ConvectionModel):
         :return: boolean
         """
 
+        bm = self._column.binding_model
         is_kinetic = self._column.binding_model.is_kinetic
         if is_kinetic:
             for j, x in enumerate(self.m.x):
                 if j > 0:
                     for k, s in enumerate(self.m.s):
-                        expr = -self.m.v * backward_dcdx(self.m, s, x)
+                        expr = -self.m.v * backward_dcdx(self.m, s, x) - self.dq_dt_expression[k, j]
                         self.m.c_ode.append(expr)
         else:
             for j, x in enumerate(self.m.x):
                 if j > 0:
                     for k, s in enumerate(self.m.s):
                         expr = -self.m.v * backward_dcdx(self.m, s, x)
+                        expr += self.dc_dt_rhs_addition[k, j]
+                        expr /= (1.0+self.dc_dt_factor[k, j])
                         self.m.c_ode.append(expr)
 
     def build_stationary_phase_balance(self, **kwargs):
@@ -658,11 +679,14 @@ class IdealConvectiveColumn(ConvectionModel):
         Creates PDEs for stationary phase mass balance for modeling chromatography column with casadi
         :return: boolean
         """
+        F = (1.0 - self._column.column_porosity) / self._column.column_porosity
         bm = self._column.binding_model
+
+        if isinstance(bm, SMABinding):
+            self.build_adsorption_equations2(**kwargs)
+            return True
+
         is_kinetic = bm.is_kinetic
-        salt_name = self._column.salt
-        if salt_name is None:
-            salt_name = ''
 
         self.m.q_expressions = dict()
         for i in range(self.m.nx):
@@ -673,26 +697,91 @@ class IdealConvectiveColumn(ConvectionModel):
                 q_var[s] = self.m.Q[k, i]
 
             for k, s in enumerate(self.m.s):
-                expr = bm.f_ads2(s, c_var, q_var)
+                expr = bm.f_ads(s, c_var, q_var)
                 self.m.q_expressions[k, i] = expr
+                self.dq_dt_expression[k, i] = expr
+
+        if is_kinetic:
+            for i in range(self.m.nx):
+                for k, s in enumerate(self.m.s):
+                    k = self.m.s_to_id[s]
+                    expr = self.m.q_expressions[k, i]
+                    self.m.q_ode.append(expr)
+        else:
+            for i in range(self.m.nx):
+                for k, s in enumerate(self.m.s):
+                    expr = self.m.q_expressions[k, i]
+                    self.m.q_alg_eq.append(expr)
+
+                    if isinstance(bm, LinearBinding):
+                        self.dc_dt_factor[k, i] = bm.ka(s)/bm.kd(s)*F
+                        self.dc_dt_rhs_addition[k, i] = 0.0
+                    else:
+                        self.dc_dt_factor[k, i] = 0.0
+                        self.dc_dt_rhs_addition[k, i] = 0.0
+
+    def build_adsorption_equations2(self, **kwargs):
+        """
+        Creates PDEs for stationary phase mass balance for modeling chromatography column with casadi
+        :return: boolean
+        """
+        F = (1.0 - self._column.column_porosity) / self._column.column_porosity
+        bm = self._column.binding_model
+        is_kinetic = bm.is_kinetic
+        salt_name = self._column.salt
 
         s_no_salt = [s for s in self.m.s if s != salt_name]
+        self.m.q_expressions = dict()
+        f_sites_expressions = dict()
+        for i in range(self.m.nx):
+            c_var = dict()
+            q_var = dict()
+
+            for k, s in enumerate(self.m.s):
+                c_var[s] = self.m.C[k, i]
+                q_var[s] = self.m.Q[k, i]
+
+            f_sites = self.m.fs[i]
+            for k, s in enumerate(self.m.s):
+                expr = bm.f_ads_given_free_sites(s, c_var, q_var, f_sites)
+                self.m.q_expressions[k, i] = expr
+                self.dq_dt_expression[k, i] = expr
+
+            f_sites_expressions[i] = bm.f_ads_given_free_sites('free_sites', c_var, q_var, f_sites)
+            self.m.q_free_sites_expr.append(f_sites-f_sites_expressions[i])
+
+        for i in range(self.m.nx):
+            k_salt = self.m.s_to_id[salt_name]
+            self.dq_dt_expression[k_salt, i] = 0.0
+            for s in s_no_salt:
+                k = self.m.s_to_id[s]
+                self.dq_dt_expression[k_salt, i] -= self.dq_dt_expression[k, i]*bm.nu(s)
+
         if is_kinetic:
             for i in range(self.m.nx):
                 for s in s_no_salt:
                     k = self.m.s_to_id[s]
                     expr = self.m.q_expressions[k, i]
                     self.m.q_ode.append(expr)
-            if salt_name != '':
-                k = self.m.s_to_id[salt_name]
-                for i in range(self.m.nx):
-                    expr = self.m.q_expressions[k, i]
-                    self.m.q_alg_eq.append(expr)
+
+            # take care of the salt as algebraic
+            k = self.m.s_to_id[salt_name]
+            for i in range(self.m.nx):
+                expr = self.m.q_expressions[k, i]
+                self.m.q_alg_eq.append(expr)
+
         else:
             for i in range(self.m.nx):
                 for k, s in enumerate(self.m.s):
                     expr = self.m.q_expressions[k, i]
                     self.m.q_alg_eq.append(expr)
+
+                    if isinstance(bm, LinearBinding):
+                        self.dc_dt_factor[k, i] = bm.ka(s) / bm.kd(s) * F
+                        self.dc_dt_rhs_addition[k, i] = 0.0
+                    else:
+                        self.dc_dt_factor[k, i] = 0.0
+                        self.dc_dt_rhs_addition[k, i] = 0.0
 
     def build_boundary_conditions(self, **kwargs):
         """
@@ -705,7 +794,7 @@ class IdealConvectiveColumn(ConvectionModel):
 
         for i, s in enumerate(self.m.s):
             expr = inlet_functions[s](s, self.m.t)
-            self.m.c_alg_eq.append(self.m.C[i, 0] - 1.0)
+            self.m.c_alg_eq.append(self.m.C[i, 0] - expr)
 
     def initialize_variables(self, trajectories=None):
         """
@@ -765,7 +854,7 @@ class IdealConvectiveColumn(ConvectionModel):
 
         result_set.C = xr.DataArray(conc,
                                     coords=[self.m.s, self.m.grid_t, self.m.x],
-                                    dims=['component', 'time', 'location'])
+                                    dims=['component', 'time', 'col_loc'])
         return result_set
 
     def build_model(self, lspan, rspan=None, **kwargs):
@@ -775,6 +864,7 @@ class IdealConvectiveColumn(ConvectionModel):
         """
         super().build_model(lspan)
 
+        bm = self._column.binding_model
 
         # concatenate state variables
         for e in self.m.q_states:
@@ -792,8 +882,19 @@ class IdealConvectiveColumn(ConvectionModel):
         for e in self.m.q_alg_eq:
             self.m.alg_eq.append(e)
 
+        if isinstance(bm, SMABinding):
+            for e in self.m.q_free_sites:
+                self.m.algebraics.append(e)
+
+            for e in self.m.q_free_sites_expr:
+                print(e)
+                self.m.alg_eq.append(e)
+
+        print(self.m.algebraics)
+
         m = self.m
 
+        """
         print("concentration variables and equations")
         print(len(m.c_states), len(m.c_ode))
         for i, v in enumerate(m.c_states):
@@ -805,7 +906,7 @@ class IdealConvectiveColumn(ConvectionModel):
             e = m.c_alg_eq[i]
             print(v, e, sep="\t")
 
-        print("q variables and equations")
+        print(" variables and equations")
         print(len(m.q_states), len(m.q_ode))
         for i, v in enumerate(m.q_states):
             e = m.q_ode[i]
@@ -814,4 +915,18 @@ class IdealConvectiveColumn(ConvectionModel):
         print(len(m.q_algebraics), len(m.q_alg_eq))
         for i, v in enumerate(m.q_algebraics):
             e = m.q_alg_eq[i]
+            print(v, e, sep="\t")
+
+        """
+
+        print("state variables and odes")
+        print(len(m.states), len(m.ode))
+        for i, v in enumerate(m.states):
+            e = m.ode[i]
+            print(v, e, sep="\t")
+
+        print("algebraic variables and equations")
+        print(len(m.algebraics), len(m.alg_eq))
+        for i, v in enumerate(m.algebraics):
+            e = m.alg_eq[i]
             print(v, e, sep="\t")
