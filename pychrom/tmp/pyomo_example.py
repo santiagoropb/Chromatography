@@ -5,6 +5,7 @@ from pychrom.core.binding_model import SMABinding
 from pychrom.modeling.pyomo_modeler import PyomoModeler
 from pychrom.modeling.cadet_modeler import CadetModeler
 import matplotlib.animation as animation
+import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,7 +20,7 @@ GRM = GRModel(components=comps)
 # create sections
 GRM.load = Section(components=comps)
 for cname in comps:
-    GRM.load.set_a0(cname, 10.0)
+    GRM.load.set_a0(cname, 1.0)
 
 GRM.load.set_a0('A', 50.0)
 GRM.load.set_a1('A', 0.0)
@@ -57,47 +58,40 @@ GRM.connect_unit_operations('column', 'outlet')
 
 # create a modeler
 modeler = PyomoModeler(GRM)
-tspan = [0.0]
+tspan = [0.0, 5.0, 20.0]
 
 # add discontinuity points to time set
 for n, sec in GRM.inlet.sections():
     tspan.append(sec.start_time_sec)
 
 # add discontinuity points to time set
-for t in np.linspace(9.0, 11.0, 10):
+for t in np.linspace(9.0, 11.0, 3):
     tspan.append(t)
+tspan.append(1500.0)
 
 for name in GRM.list_components():
     nu = 3.0
     GRM.column.binding_model.set_nu(name, nu)
 
-tspan.append(1500.0)
 q_scale = {'A': 1200.0}
 c_scale = {'A': 50.0}
 
 modeler.build_model(tspan,
                     #model_type='ConvectionModel',
-                    #model_type='DispersionModel',
-                    model_type='IdealConvectiveModel',
+                    model_type='IdealConvectiveModel2',
                     #model_type='IdealDispersiveModel',
                     q_scale=q_scale,
                     c_scale=c_scale,
                     options={'smooth':False})
 
+#m = modeler.pyomo_column.pyomo_model()
+#m.pprint()
+#sys.exit()
 print("done building")
 modeler.discretize_space()
 print("done discretizing space")
 modeler.discretize_time()
 print("done discretizing time")
-"""
-cadet_modeler = CadetModeler(GRM)
-ncol=50
-npar=10
-cadet_modeler.discretize_column('column', ncol, npar)
-tspan = range(1500)
-trajectories = cadet_modeler.run_sim(tspan, retrive_c='all')
-"""
-modeler.initialize_variables()
 
 results = modeler.run_sim(solver_opts={'halt_on_ampl_error':'yes'})
 
@@ -110,7 +104,7 @@ for cname in results.components:
     #plt.plot(plot2d.time, plot2d)
 
     plt.show()
-"""
+
 fig = plt.figure()
 ax1 = fig.add_subplot(1, 1, 1)
 textos = []
@@ -133,4 +127,3 @@ def animate(l):
 n_locations = len(results.C.coords['col_loc'])
 ani = animation.FuncAnimation(fig, animate, interval=n_locations)
 plt.show()
-"""
