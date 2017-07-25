@@ -45,6 +45,10 @@ class BindingModel(DataManager, abc.ABC):
         self._check_model()
         self._is_kinetic = value
 
+    def is_salt(self, name):
+        # sma  overwrites this method
+        return False
+
     @property
     def binding_type(self):
         return self._binding_type
@@ -309,6 +313,19 @@ class SMABinding(BindingModel):
 
         self._binding_type = BindingType.STERIC_MASS_ACTION
 
+    @property
+    def salt(self):
+        return self._model().salt
+
+    @salt.setter
+    def salt(self, name):
+        msg = "binding model cannot set salt. "
+        msg += "Set the salt from the Chromatography model"
+        raise RuntimeError(msg)
+
+    def is_salt(self, name):
+        return self._model().is_salt(name)
+
     def ka(self, comp_name):
         return self.get_index_parameter(comp_name, 'sma_ka')
 
@@ -509,9 +526,47 @@ class SMABinding(BindingModel):
 
         # desorption term
         kd = self.kd(comp_name)
-        desorption = kd * q_vars[comp_name] * (c_vars[salt_name]) ** vi
+        desorption = kd * q_vars[comp_name] * c_vars[salt_name] ** vi
 
         return adsorption - desorption
+
+    def new_fads(self, comp_name, c_vars, q_vars, **kwargs):
+
+        free_sites = kwargs.pop('fs', None)
+
+        no_salt_list = [cname for cname in self.list_components() if not self.is_salt(cname)]
+        if self.is_salt(comp_name):
+            q_salt = self.lamda
+            for n in no_salt_list:
+                qj = q_vars[n]
+                q_salt -= self.nu(n)*qj
+            return q_salt - q_vars[comp_name]
+        elif comp_name == 'free_sites':
+            if free_sites is None:
+                raise RuntimeError('Need to provide fs')
+            else:
+                q_free_sites = q_vars[self.salt]
+                for n in no_salt_list:
+                    qj = q_vars[n]
+                    q_free_sites -= self.sigma(n) * qj
+                return q_free_sites - free_sites
+        else:
+            if free_sites is None:
+                q_free_sites = self.lamda
+                for n in no_salt_list:
+                    qj = q_vars[n]
+                    q_free_sites -= (self.nu(n) + self.sigma(n)) * qj
+                ads = self.ka(comp_name)*c_vars[comp_name]*q_free_sites**self.nu(comp_name)
+                des = self.kd(comp_name)*q_vars[comp_name]*c_vars[self.salt]**self.nu(comp_name)
+
+            else:
+                q_free_sites = free_sites
+                ads = self.ka(comp_name) * c_vars[comp_name] * q_free_sites ** self.nu(comp_name)
+                des = self.kd(comp_name) * q_vars[comp_name] * c_vars[self.salt] ** self.nu(comp_name)
+
+            return ads - des
+
+
 
     @property
     def lamda(self):

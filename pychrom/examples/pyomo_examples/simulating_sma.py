@@ -89,15 +89,17 @@ modeler.discretize_space()
 print("done discretizing space")
 modeler.discretize_time()
 print("done discretizing time")
-"""
+
 cadet_modeler = CadetModeler(GRM)
 ncol=50
 npar=10
 cadet_modeler.discretize_column('column', ncol, npar)
 tspan = range(1500)
 trajectories = cadet_modeler.run_sim(tspan, retrive_c='all')
-"""
-modeler.initialize_variables()
+
+del trajectories.Q
+
+modeler.initialize_variables(trajectories)
 
 results = modeler.run_sim(solver_opts={'halt_on_ampl_error':'yes'})
 

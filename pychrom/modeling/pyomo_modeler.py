@@ -1,5 +1,6 @@
 from pychrom.modeling.pyomo.models import IdealConvectiveColumn, ConvectionModel
 from pychrom.modeling.pyomo.models import IdealDispersiveColumn, DispersionModel
+from pychrom.modeling.pyomo.models import IdealConvectiveColumn2
 from pychrom.core.unit_operation import Column
 import pyomo.environ as pe
 import warnings
@@ -66,6 +67,9 @@ class PyomoModeler(object):
             self.pyomo_column.build_pyomo_model(tspan, lspan=lspan, rspan=None, **options)
         elif model_type == 'IdealConvectiveModel':
             self.pyomo_column = IdealConvectiveColumn(self._column)
+            self.pyomo_column.build_pyomo_model(tspan, lspan=lspan, rspan=None, **options)
+        elif model_type == 'IdealConvectiveModel2':
+            self.pyomo_column = IdealConvectiveColumn2(self._column)
             self.pyomo_column.build_pyomo_model(tspan, lspan=lspan, rspan=None, **options)
         elif model_type == 'IdealDispersiveModel':
             self.pyomo_column = IdealDispersiveColumn(self._column)

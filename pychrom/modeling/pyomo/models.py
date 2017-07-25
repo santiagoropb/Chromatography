@@ -870,3 +870,217 @@ class IdealDispersiveColumn(DispersionModel):
                                           'par_loc'])
 
         return result_set
+
+
+class IdealConvectiveColumn2(ConvectionModel):
+
+    def __init__(self, column):
+
+        super().__init__(column)
+
+    def setup_base(self, tspan, lspan=None, rspan=None, **kwargs):
+        """
+        Creates base sets and params for modeling a chromatography column with pyomo
+        :param tspan:
+        :param lspan:
+        :param rspan:
+        :return: None
+        """
+        super().setup_base(tspan, lspan, rspan, **kwargs)
+
+    def build_variables(self, **kwargs):
+        """
+        Create variables for modeling chromatography column with pyomo
+        :return: None
+        """
+
+        super().build_variables(**kwargs)
+
+        scale_vars = kwargs.pop('scale_q', False)
+        define_Q_vars(self.m,
+                      scale_vars=scale_vars,
+                      index_radius=False)
+
+        if isinstance(self._column.binding_model, SMABinding):
+            define_free_sites_vars(self.m, scale_vars=True, index_radius=False)
+
+    def build_mobile_phase_balance(self, **kwargs):
+        """
+        Creates PDEs for mobile phase mass balance for modeling chromatography column with pyomo
+        :return: None
+        """
+
+        F =  (1.0 - self._column.column_porosity) / self._column.column_porosity
+        u = self._column.velocity
+
+        # mobile phase mass balance
+        def rule_mass_balance(m, s, t, x):
+
+            if x == m.x.first():
+                return pe.Constraint.Skip
+            if t == m.t.first():
+                return pe.Constraint.Skip
+
+            lhs = m.dCdt[s, t, x]
+            rhs = -u*m.dCdx[s, t, x] - F * self.m.dQdt[s, t, x]
+            return lhs == rhs
+
+        self.m.mass_balance_mobile = pe.Constraint(self.m.s,
+                                                   self.m.t,
+                                                   self.m.x,
+                                                   rule=rule_mass_balance)
+        return True
+
+    def build_stationary_phase_balance(self, **kwargs):
+        """
+        Creates PDEs for stationary phase mass balance for modeling chromatography column with pyomo
+        :return: boolean
+        """
+
+        return False
+
+    def build_adsorption_equations(self, **kwargs):
+        """
+        Creates PDEs for stationary phase mass balance for modeling chromatography column with pyomo
+        :return: boolean
+        """
+        bm = self._column.binding_model
+
+        def rule_adsorption(m, s, t, x):
+
+            # put variables in dictionary
+            c_vars = dict()
+            q_vars = dict()
+            for cname in m.s:
+                c_vars[cname] = m.C[cname, t, x]
+                q_vars[cname] = m.Q[cname, t, x]
+
+            if bm.is_kinetic:
+                if bm.is_salt(s):
+                    return 0.0 == bm.new_fads(s, c_vars, q_vars)
+                else:
+                    if t == m.t.first():
+                        return pe.Constraint.Skip
+                    else:
+                        return m.dQdt[s, t, x] == bm.new_fads(s, c_vars, q_vars)
+            else:
+                return 0.0 == bm.new_fads(s, c_vars, q_vars)
+
+        def rule_adsorption_sma(m, s, t, x):
+
+            # put variables in dictionary
+            c_vars = dict()
+            q_vars = dict()
+            for cname in m.s:
+                c_vars[cname] = m.C[cname, t, x]
+                q_vars[cname] = m.Q[cname, t, x]
+
+            if bm.is_kinetic:
+                if bm.is_salt(s):
+                    return 0.0 == bm.new_fads(s, c_vars, q_vars, fs=self.m.free_sites[t, x])
+                else:
+                    if t == m.t.first():
+                        return pe.Constraint.Skip
+                    else:
+                        return m.dQdt[s, t, x] == bm.new_fads(s, c_vars, q_vars, fs=self.m.free_sites[t, x])
+            else:
+                return 0.0 == bm.new_fads(s, c_vars, q_vars, fs=self.m.free_sites[t, x])
+
+        def rule_free_sites(m, t, x):
+
+            # put variables in dictionary
+            c_vars = dict()
+            q_vars = dict()
+            for cname in m.s:
+                c_vars[cname] = m.C[cname, t, x]
+                q_vars[cname] = m.Q[cname, t, x]
+            return 0.0 == bm.new_fads('free_sites', c_vars, q_vars, fs=self.m.free_sites[t, x])
+
+        #if not isinstance(bm, SMABinding):
+        self.m.adsorption = pe.Constraint(self.m.s, self.m.t, self.m.x, rule=rule_adsorption)
+        #else:
+        #    self.m.adsorption = pe.Constraint(self.m.s, self.m.t, self.m.x, rule=rule_adsorption_sma)
+        #    self.m.c_free_sites = pe.Constraint(self.m.t, self.m.x, rule=rule_free_sites)
+
+    def build_boundary_conditions(self, **kwargs):
+        """
+        Creates expressions for boundary conditions
+        :return: None
+        """
+
+        super().build_boundary_conditions(**kwargs)
+
+    def build_initial_conditions(self, **kwargs):
+        """
+        Creates expressions for boundary conditions
+        :return: None
+        """
+
+        super().build_initial_conditions(**kwargs)
+
+        bm = self._column.binding_model
+
+        # only imposes initial conditions on states
+        def rule_init_q(m, s, x):
+            if bm.is_kinetic:
+                if not bm.is_salt(s):
+                    return m.Q[s, 0.0, x] == self._column.init_q(s)
+                else:
+                    return pe.Constraint.Skip
+            else:
+                return pe.Constraint.Skip
+
+        self.m.init_q = pe.Constraint(self.m.s, self.m.x, rule=rule_init_q)
+
+    def initialize_variables(self, trajectories=None):
+
+        super().initialize_variables(trajectories)
+
+        # get the concentration variable
+        qvar = 'gamma' if hasattr(self.m, 'gamma') else 'Q'
+        pyomo_q_var = getattr(self.m, qvar)
+
+        # defaults initializes all with initial conditions
+        if trajectories is None:
+            for s in self.m.s:
+                for t in self.m.t:
+                    for x in self.m.x:
+                        pyomo_q_var[s, t, x].value = self._column.init_q(s) / pe.value(self.m.sq[s])
+        else:
+            if hasattr(trajectories, 'Q'):
+                r = self._column.particle_radius
+                for s in self.m.s:
+                    Qn = trajectories.Q.sel(component=s)
+                    for t in self.m.t:
+                        for x in self.m.x:
+                            val = Qn.sel(time=t, col_loc=x, par_loc=r, method='nearest')
+                            pyomo_q_var[s, t, x].value = float(val) / pe.value(self.m.sq[s])
+
+    def store_values_in_data_set(self):
+        result_set = super().store_values_in_data_set()
+
+        nt = len(self.m.t)
+        ns = len(self.m.s)
+        nx = len(self.m.x)
+
+        conc = np.zeros((ns, nt, nx, 1))
+
+        for i, s in enumerate(result_set.components):
+            for j, t in enumerate(result_set.times):
+                for k, x in enumerate(result_set.col_locs):
+                    conc[i, j, k, 0] = pe.value(self.m.Q[s, t, x])
+
+        # store concentrations
+        r = self._column.particle_radius
+        result_set.par_locs = np.array([r])
+        result_set.Q = xr.DataArray(conc,
+                                    coords=[result_set.components,
+                                            result_set.times,
+                                            result_set.col_locs,
+                                            result_set.par_locs],
+                                    dims=['component',
+                                          'time',
+                                          'col_loc',
+                                          'par_loc'])
+
+        return result_set

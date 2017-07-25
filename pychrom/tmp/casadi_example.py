@@ -62,9 +62,9 @@ GRM.connect_unit_operations('column', 'outlet')
 modeler = CasadiModeler(GRM)
 lspan = np.linspace(0, GRM.column.length, 50)
 
-#modeler.build_model(lspan, model_type='ConvectionModel')
+modeler.build_model(lspan, model_type='ConvectionModel')
 #modeler.build_model(lspan, model_type='DispersionModel')
-modeler.build_model(lspan, model_type='IdealConvectiveColumn')
+#modeler.build_model(lspan, model_type='IdealConvectiveColumn')
 
 
 #sys.exit()

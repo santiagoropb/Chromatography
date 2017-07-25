@@ -38,7 +38,7 @@ GRM.inlet.add_section('elute')
 # create binding
 GRM.salt = 'salt'
 GRM.binding = SMABinding(data="sma.yml")
-GRM.binding.is_kinetic = False
+GRM.binding.is_kinetic = True
 
 # create column
 GRM.column = Column(data="column.yml")
@@ -78,10 +78,15 @@ if retrive_c == 'in_out':
 else:
 
     for cname in results.components:
-        to_plot = results.C.sel(component=cname)
+        #to_plot = results.C.sel(component=cname)
 
-        #to_q = results.Q.sel(component=cname)
-        #to_plot = to_q.sel(col_loc=0.0)
+        to_q = results.Q.sel(component=cname)
+        to_plot = to_q.sel(col_loc=0.0)
+        for t in results.times:
+            for x in results.col_locs:
+                for r in results.par_locs:
+                    print(cname, float(to_q.sel(time=t, col_loc=x, par_loc=r)))
+
         to_plot.plot()
         plt.show()
 
