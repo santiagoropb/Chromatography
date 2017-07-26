@@ -426,6 +426,7 @@ class SMABinding(BindingModel):
 
         return adsorption-desorption
 
+
     def f_ads2(self, comp_name, c_vars, q_vars, **kwargs):
         self._check_model()
         q_ref = kwargs.pop('q_ref', 1.0)
