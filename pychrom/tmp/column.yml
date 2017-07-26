@@ -3,29 +3,29 @@ index parameters: !!python/object/apply:collections.OrderedDict
     - film_diffusion: 6.9e-06
       init_c: 50.0
       init_q: 1200.0
-      par_diffusion: 7.0e-10
+      par_diffusion: 7.0e-5
       par_surfdiffusion: 0.0
   - - B
     - film_diffusion: 6.9e-06
       init_c: 0.0
       init_q: 0.0
-      par_diffusion: 6.07e-11
+      par_diffusion: 6.07e-6
       par_surfdiffusion: 0.0
   - - C
     - film_diffusion: 6.9e-06
       init_c: 0.0
       init_q: 0.0
-      par_diffusion: 6.07e-11
+      par_diffusion: 6.07e-6
       par_surfdiffusion: 0.0
   - - D
     - film_diffusion: 6.9e-06
       init_c: 0.0
       init_q: 0.0
-      par_diffusion: 6.07e-11
+      par_diffusion: 6.07e-6
       par_surfdiffusion: 0.0
 scalar parameters:
   binding: binding
-  col_dispersion: 5.75e-08
+  col_dispersion: 5.75e-11
   col_length: 0.014
   col_porosity: 0.37
   par_porosity: 0.75

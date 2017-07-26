@@ -70,7 +70,7 @@ for t in np.linspace(9.0, 11.0, 3):
 tspan.append(1500.0)
 
 for name in GRM.list_components():
-    nu = 3.0
+    nu = 3.1
     GRM.column.binding_model.set_nu(name, nu)
 
 q_scale = {'A': 1200.0}
@@ -93,37 +93,29 @@ print("done discretizing space")
 modeler.discretize_time()
 print("done discretizing time")
 
+cadet_modeler = CadetModeler(GRM)
+ncol=50
+npar=10
+cadet_modeler.discretize_column('column', ncol, npar)
+tspan = range(1500)
+trajectories = cadet_modeler.run_sim(tspan, retrive_c='all')
+
+time = trajectories.C.coords['time']
+components = trajectories.C.coords['component']
+for cname in components:
+    if cname!= 'A':
+        traj = trajectories.C.sel(time=time, col_loc=GRM.column.length, component=cname)
+        plt.plot(time, traj)
+plt.show()
+
 results = modeler.run_sim(solver_opts={'halt_on_ampl_error':'yes'})
 
-for cname in results.components:
-    to_plot = results.C.sel(component=cname)
-    #print(to_plot)
-    to_plot.plot()
+plt.figure()
 
-    #plot2d = to_plot.sel(location=0.0)
-    #plt.plot(plot2d.time, plot2d)
-
-    plt.show()
-
-fig = plt.figure()
-ax1 = fig.add_subplot(1, 1, 1)
-textos = []
-
-def animate(l):
-    time = results.C.coords['time']
-    components = results.C.coords['component']
-    loc = results.C.coords['col_loc'][l]
-    print(loc)
-    ax1.clear()
-    for cname in components:
-        if cname != 'A':
-            traj = results.C.sel(time=time, col_loc=loc, component=cname)
-            ax1.plot(time, traj)
-    texto = fig.text(0, 0, 'Location {:.3}'.format(float(loc)))
-    textos.append(texto)
-    if l>1:
-        textos[l-1].remove()
-
-n_locations = len(results.C.coords['col_loc'])
-ani = animation.FuncAnimation(fig, animate, interval=n_locations)
+time = results.C.coords['time']
+components = results.C.coords['component']
+for cname in components:
+    if cname != 'A':
+        traj = results.C.sel(time=time, col_loc=GRM.column.length, component=cname)
+        plt.plot(time, traj)
 plt.show()

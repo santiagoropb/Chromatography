@@ -2,6 +2,7 @@ from __future__ import print_function
 from pychrom.core.registrar import Registrar
 from pychrom.core.data_manager import DataManager
 from enum import Enum
+import pyomo.environ as pe
 import pandas as pd
 import numpy as np
 import warnings
@@ -477,6 +478,7 @@ class SMABinding(BindingModel):
         unfixed_index_params = kwargs.pop('unfixed_index_params', None)
         unfixed_scalar_params = kwargs.pop('unfixed_scalar_params', None)
         scale_vars = kwargs.pop('scale_vars', None)
+        smoothing = kwargs.pop('smmothing', True)
 
         if unfixed_index_params is not None or unfixed_scalar_params is not None:
             raise NotImplementedError()
@@ -519,6 +521,14 @@ class SMABinding(BindingModel):
         # scale q_0_bar
         gamma_0_bar = free_sites_var
 
+        if smoothing:
+            eps = 1e-3
+            eps2 = 1e-5
+            gamma_0_bar = 0.5 * (1 + gamma_0_bar / (gamma_0_bar ** 2 + eps ** 2) ** 0.5) * gamma_0_bar + eps2
+            c_salt = 0.5 * (1 + c_vars[self.salt] / (c_vars[self.salt] ** 2 + eps ** 2) ** 0.5) * c_vars[self.salt] + eps2
+        else:
+            c_salt = c_vars[self.salt]
+
         # adsorption term
         ka = self.ka(comp_name)
         vi = self.nu(comp_name)
@@ -526,13 +536,14 @@ class SMABinding(BindingModel):
 
         # desorption term
         kd = self.kd(comp_name)
-        desorption = kd * q_vars[comp_name] * c_vars[salt_name] ** vi
+        desorption = kd * q_vars[comp_name] * c_salt ** vi
 
         return adsorption - desorption
 
     def new_fads(self, comp_name, c_vars, q_vars, **kwargs):
 
         free_sites = kwargs.pop('fs', None)
+        smoothing = kwargs.pop('smmothing', True)
 
         no_salt_list = [cname for cname in self.list_components() if not self.is_salt(cname)]
         if self.is_salt(comp_name):
@@ -556,13 +567,29 @@ class SMABinding(BindingModel):
                 for n in no_salt_list:
                     qj = q_vars[n]
                     q_free_sites -= (self.nu(n) + self.sigma(n)) * qj
+
+                if smoothing:
+                    eps = 1e-3
+                    eps2 = 1e-9
+                    q_free_sites = 0.5 * (1 + q_free_sites / (q_free_sites ** 2 + eps ** 2) ** 0.5) * q_free_sites + eps2
+                    c_salt = 0.5 * (1 + c_vars[self.salt] / (c_vars[self.salt] ** 2 + eps ** 2) ** 0.5) * c_vars[self.salt] + eps2
+                else:
+                    c_salt = c_vars[self.salt]
+
                 ads = self.ka(comp_name)*c_vars[comp_name]*q_free_sites**self.nu(comp_name)
-                des = self.kd(comp_name)*q_vars[comp_name]*c_vars[self.salt]**self.nu(comp_name)
+                des = self.kd(comp_name)*q_vars[comp_name]*c_salt**self.nu(comp_name)
 
             else:
                 q_free_sites = free_sites
+                if smoothing:
+                    eps = 1e-3
+                    eps2 = 1e-9
+                    q_free_sites = 0.5 * (1 + q_free_sites / (q_free_sites ** 2 + eps ** 2) ** 0.5) * q_free_sites + eps2
+                    c_salt = 0.5 * (1 + c_vars[self.salt] / (c_vars[self.salt] ** 2 + eps ** 2) ** 0.5) * c_vars[self.salt] +eps2
+                else:
+                    c_salt = c_vars[self.salt]
                 ads = self.ka(comp_name) * c_vars[comp_name] * q_free_sites ** self.nu(comp_name)
-                des = self.kd(comp_name) * q_vars[comp_name] * c_vars[self.salt] ** self.nu(comp_name)
+                des = self.kd(comp_name) * q_vars[comp_name] * c_salt ** self.nu(comp_name)
 
             return ads - des
 
