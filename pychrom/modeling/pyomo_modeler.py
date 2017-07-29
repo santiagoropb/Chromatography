@@ -93,7 +93,7 @@ class PyomoModeler(object):
 
         # Discretize using Finite Difference
         discretizer = pe.TransformationFactory('dae.finite_difference')
-        discretizer.apply_to(m, nfe=50, wrt=m.x, scheme='BACKWARD')
+        discretizer.apply_to(m, nfe=35, wrt=m.x, scheme='BACKWARD')
 
         #discretizer = pe.TransformationFactory('dae.collocation')
         #discretizer.apply_to(m, nfe=40, ncp=3, wrt=m.x)
@@ -103,7 +103,7 @@ class PyomoModeler(object):
 
         # Discretize using Finite elements and collocation
         discretizer = pe.TransformationFactory('dae.collocation')
-        discretizer.apply_to(m, nfe=60, ncp=1, wrt=m.t)
+        discretizer.apply_to(m, nfe=110, ncp=1, wrt=m.t)
 
     def initialize_variables(self, trajectories=None):
         self.pyomo_column.initialize_variables(trajectories=trajectories)

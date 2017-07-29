@@ -524,9 +524,14 @@ class SMABinding(BindingModel):
 
         if smoothing:
             eps = 1e-3
-            eps2 = 1e-5
-            gamma_0_bar = 0.5 * (1 + gamma_0_bar / (gamma_0_bar ** 2 + eps ** 2) ** 0.5) * gamma_0_bar + eps2
-            c_salt = 0.5 * (1 + c_vars[self.salt] / (c_vars[self.salt] ** 2 + eps ** 2) ** 0.5) * c_vars[self.salt] + eps2
+            eps2 = 1e-3
+            #gamma_0_bar = 0.5 * (1 + gamma_0_bar / (gamma_0_bar ** 2 + eps ** 2) ** 0.5) * gamma_0_bar + eps2
+            #c_salt = 0.5 * (1 + c_vars[self.salt] / (c_vars[self.salt] ** 2 + eps ** 2) ** 0.5) * c_vars[self.salt] + eps2
+
+            eps = 1e-4
+            gamma_0_bar = (gamma_0_bar**2+eps)**0.5
+            c_salt = (c_vars[self.salt]**2+eps)**0.5
+
         else:
             c_salt = c_vars[self.salt]
 

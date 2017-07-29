@@ -597,6 +597,9 @@ class IdealConvectiveColumn(ConvectionModel):
 
         self.m.init_q = pe.Constraint(self.m.s, self.m.x, rule=rule_init_q)
 
+
+
+
     def initialize_variables(self, trajectories=None):
 
         super().initialize_variables(trajectories)
@@ -623,6 +626,9 @@ class IdealConvectiveColumn(ConvectionModel):
 
     def store_values_in_data_set(self):
         result_set = super().store_values_in_data_set()
+
+        #self.m.numerator.pprint()
+        #self.m.denominator.pprint()
 
         nt = len(self.m.t)
         ns = len(self.m.s)
