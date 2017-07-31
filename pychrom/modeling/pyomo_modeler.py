@@ -87,23 +87,23 @@ class PyomoModeler(object):
             for k, v in q_scale.items():
                 m.sq[k] = v
 
-    def discretize_space(self):
+    def discretize_space(self, nfe):
 
         m = self.pyomo_column.m
 
         # Discretize using Finite Difference
         discretizer = pe.TransformationFactory('dae.finite_difference')
-        discretizer.apply_to(m, nfe=35, wrt=m.x, scheme='BACKWARD')
+        discretizer.apply_to(m, nfe=nfe, wrt=m.x, scheme='BACKWARD')
 
         #discretizer = pe.TransformationFactory('dae.collocation')
         #discretizer.apply_to(m, nfe=40, ncp=3, wrt=m.x)
 
-    def discretize_time(self):
+    def discretize_time(self, nfe, ncp=1):
         m = self.pyomo_column.m
 
         # Discretize using Finite elements and collocation
         discretizer = pe.TransformationFactory('dae.collocation')
-        discretizer.apply_to(m, nfe=110, ncp=1, wrt=m.t)
+        discretizer.apply_to(m, nfe=nfe, ncp=ncp, wrt=m.t)
 
     def initialize_variables(self, trajectories=None):
         self.pyomo_column.initialize_variables(trajectories=trajectories)

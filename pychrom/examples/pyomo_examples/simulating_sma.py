@@ -19,7 +19,7 @@ GRM = GRModel(components=comps)
 # create sections
 GRM.load = Section(components=comps)
 for cname in comps:
-    GRM.load.set_a0(cname, 10.0)
+    GRM.load.set_a0(cname, 1.0)
 
 GRM.load.set_a0('A', 50.0)
 GRM.load.set_a1('A', 0.0)
@@ -64,7 +64,7 @@ for n, sec in GRM.inlet.sections():
     tspan.append(sec.start_time_sec)
 
 # add discontinuity points to time set
-for t in np.linspace(9.0, 11.0, 10):
+for t in np.linspace(1.0, 15.0, 15):
     tspan.append(t)
 
 for name in GRM.list_components():
@@ -85,9 +85,9 @@ modeler.build_model(tspan,
                     options={'smooth':False})
 
 print("done building")
-modeler.discretize_space()
+modeler.discretize_space(50)
 print("done discretizing space")
-modeler.discretize_time()
+modeler.discretize_time(60)
 print("done discretizing time")
 
 cadet_modeler = CadetModeler(GRM)

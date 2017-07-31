@@ -89,7 +89,5 @@ class CasadiModeler(object):
 
         integrator = ca.integrator('I', 'idas', dae, opts)
 
-        #z0 = 10*np.ones(len(m.algebraics))
-
         sol = integrator(x0=m.init_conditions, p=self._parameters)
         return self.casadi_column.store_values_in_data_set(sol)

@@ -598,8 +598,6 @@ class IdealConvectiveColumn(ConvectionModel):
         self.m.init_q = pe.Constraint(self.m.s, self.m.x, rule=rule_init_q)
 
 
-
-
     def initialize_variables(self, trajectories=None):
 
         super().initialize_variables(trajectories)

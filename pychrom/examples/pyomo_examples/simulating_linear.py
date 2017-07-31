@@ -100,9 +100,9 @@ modeler.build_model(tspan,
                     options={'smooth':False})
 
 print("done building")
-modeler.discretize_space()
+modeler.discretize_space(50)
 print("done discretizing space")
-modeler.discretize_time()
+modeler.discretize_time(60)
 print("done discretizing time")
 
 modeler.initialize_variables()

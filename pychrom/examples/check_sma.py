@@ -40,11 +40,20 @@ def check_zeros(dataset, ka, kd, sigma, nu, lamda, salt_name):
                         cp = float(dataset.Cp.sel(component=cname, time=t, col_loc=x, par_loc=r))
                         q = float(dataset.Q.sel(component=cname, time=t, col_loc=x, par_loc=r))
                         cp_salt = float(dataset.Cp.sel(component=salt_name, time=t, col_loc=x, par_loc=r))
+                        q_salt = float(dataset.Q.sel(component=salt_name, time=t, col_loc=x, par_loc=r))
 
                         value = ka[cname]*cp*q_free_sites**nu[cname] - kd[cname]*q*cp_salt**nu[cname]
 
                         if abs(value) > 1e-1:
-                            print(cname, value, q_vals, cp, q, cp_salt, q_free_sites)
+                            print('---------------------------------------------------------------------')
+                            print(cname, value)
+                            print('q_vals',q_vals)
+                            print('cp', cp)
+                            print('q', q)
+                            print('cp0', cp_salt)
+                            print('q0', q_salt)
+                            print('fs',q_free_sites)
+                            print('---------------------------------------------------------------------')
 
                     accum += value
 

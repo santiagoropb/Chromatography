@@ -382,50 +382,49 @@ class SMABinding(BindingModel):
         :return: expression if pyomo variable or scalar value
         """
         self._check_model()
-        q_ref = kwargs.pop('q_ref', 1.0)
+
+        assert self._model().salt is not None, "Salt must be defined in chromatography model"
 
         if not self.is_fully_specified():
             self.is_fully_specified(print_out=True)
             raise RuntimeError("Missing parameters")
 
-        _scalar_params = self.get_scalar_parameters(with_defaults=True)
+        free_sites = kwargs.pop('fs', None)
+        smoothing = kwargs.pop('smoothing', True)
 
-        assert self._model().salt is not None, "Salt must be defined in chromatography model"
+        no_salt_list = [cname for cname in self.list_components() if not self.is_salt(cname)]
 
-        # get list components
-        components = self._model().list_components()
-        # determine if salt
-        is_salt = self._model().is_salt(comp_name)
-        salt_name = self._model().salt
+        if self.is_salt(comp_name):
+            q_salt = self.lamda
+            for n in no_salt_list:
+                qj = q_vars[n]
+                q_salt -= self.nu(n) * qj
+            return q_salt
+        elif comp_name == 'free_sites':
+            q_free_sites = q_vars[self.salt]
+            for n in no_salt_list:
+                qj = q_vars[n]
+                q_free_sites -= self.sigma(n) * qj
+            return q_free_sites
+        else:
+            if free_sites is None:
+                q_free_sites = q_vars[self.salt]
+                for n in no_salt_list:
+                    qj = q_vars[n]
+                    q_free_sites -= self.sigma(n) * qj
+            else:
+                q_free_sites = free_sites
 
-        loop_nosalt = [n for n in components if n != salt_name]
-        q_0 = _scalar_params['sma_lambda']
-        for cname in loop_nosalt:
-            vj = self.nu(cname)
-            q_0 -= vj * q_vars[cname]
+            if smoothing:
+                eps = 1e-4
+                q_free_sites = (q_free_sites ** 2 + eps) ** 0.5
+                c_salt = (c_vars[self.salt] ** 2 + eps) ** 0.5
+            else:
+                c_salt = c_vars[self.salt]
 
-        if is_salt:
-            return q_0
-
-        q_0_bar = q_0
-        for cname in loop_nosalt:
-            sj = self.sigma(cname)
-            q_0_bar -= sj*q_vars[cname]
-
-        # scale q_0_bar
-        gamma_0_bar = q_0_bar*q_ref
-        #gamma_0_bar = q_0_bar
-        # adsorption term
-        ka = self.ka(comp_name)
-        vi = self.nu(comp_name)
-        adsorption = ka * c_vars[comp_name] * (gamma_0_bar) ** vi
-
-        # desorption term
-        kd = self.kd(comp_name)
-        desorption = kd * q_vars[comp_name] * (c_vars[salt_name]) ** vi
-
-        return adsorption-desorption
-
+            ads = self.ka(comp_name) * c_vars[comp_name] * q_free_sites ** self.nu(comp_name)
+            des = self.kd(comp_name) * q_vars[comp_name] * c_salt ** self.nu(comp_name)
+            return ads - des
 
     def f_ads2(self, comp_name, c_vars, q_vars, **kwargs):
         self._check_model()

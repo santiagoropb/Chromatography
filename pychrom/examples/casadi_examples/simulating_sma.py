@@ -68,7 +68,7 @@ modeler.build_model(lspan, model_type='IdealConvectiveColumn')
 
 
 #sys.exit()
-tspan = np.linspace(0, 1500, 1500)
+tspan = np.linspace(0, 1500, 3)
 results = modeler.run_sim(tspan)
 
 for cname in results.components:

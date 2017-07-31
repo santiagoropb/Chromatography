@@ -252,6 +252,7 @@ class TestSMABindingModel(unittest.TestCase):
         val = self.test_data['index parameters'][cname]['sma_sigma']
         self.assertEqual(bm.sigma(cname), val)
 
+    @unittest.skip("")
     def test_f_ads(self):
 
         GRM = self.m
