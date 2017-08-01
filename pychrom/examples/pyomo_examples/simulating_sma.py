@@ -1,18 +1,11 @@
-from pychrom.core.chromatograpy_model import GRModel
-from pychrom.core.section import Section
-from pychrom.core.unit_operation import Inlet, Column, Outlet
-from pychrom.core.binding_model import SMABinding
+from pychrom.core import *
 from pychrom.modeling.pyomo_modeler import PyomoModeler
 from pychrom.modeling.cadet_modeler import CadetModeler
 import matplotlib.animation as animation
-
 import matplotlib.pyplot as plt
 import numpy as np
 
-comps = ['A',
-         'B',
-         'C',
-         'D']
+comps = ['A', 'B', 'C', 'D']
 
 GRM = GRModel(components=comps)
 
@@ -64,7 +57,7 @@ for n, sec in GRM.inlet.sections():
     tspan.append(sec.start_time_sec)
 
 # add discontinuity points to time set
-for t in np.linspace(1.0, 15.0, 15):
+for t in np.linspace(1.0, 15.0, 16):
     tspan.append(t)
 
 for name in GRM.list_components():
@@ -76,10 +69,7 @@ q_scale = {'A': 1200.0}
 c_scale = {'A': 50.0}
 
 modeler.build_model(tspan,
-                    #model_type='ConvectionModel',
-                    #model_type='DispersionModel',
                     model_type='IdealConvectiveModel',
-                    #model_type='IdealDispersiveModel',
                     q_scale=q_scale,
                     c_scale=c_scale,
                     options={'smooth':False})
@@ -91,9 +81,7 @@ modeler.discretize_time(60)
 print("done discretizing time")
 
 cadet_modeler = CadetModeler(GRM)
-ncol=50
-npar=10
-cadet_modeler.discretize_column('column', ncol, npar)
+cadet_modeler.discretize_column('column', ncol=50, npar=10)
 tspan = range(1500)
 trajectories = cadet_modeler.run_sim(tspan, retrive_c='all')
 
@@ -101,16 +89,11 @@ del trajectories.Q
 
 modeler.initialize_variables(trajectories)
 
-results = modeler.run_sim(solver_opts={'halt_on_ampl_error':'yes'})
+results = modeler.solve(solver_opts={'halt_on_ampl_error':'yes'})
 
 for cname in results.components:
     to_plot = results.C.sel(component=cname)
-    #print(to_plot)
     to_plot.plot()
-
-    #plot2d = to_plot.sel(location=0.0)
-    #plt.plot(plot2d.time, plot2d)
-
     plt.show()
 
 fig = plt.figure()

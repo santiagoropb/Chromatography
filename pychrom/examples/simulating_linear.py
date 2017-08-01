@@ -1,13 +1,11 @@
-from pychrom.core.chromatograpy_model import GRModel
-from pychrom.core.section import Section
-from pychrom.core.unit_operation import Inlet, Column, Outlet
-from pychrom.core.binding_model import LinearBinding
+
 from pychrom.modeling.cadet_modeler import CadetModeler
+from pychrom.core import *
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
 
-comps = ['A','B']
+comps = ['A', 'B']
 
 GRM = GRModel(components=comps)
 
@@ -63,16 +61,12 @@ GRM.connect_unit_operations('column', 'outlet')
 
 # create a modeler
 modeler = CadetModeler(GRM)
-ncol=50
-npar=5
-modeler.discretize_column('column', ncol, npar)
+modeler.discretize_column('column', ncol=50, npar=5)
 
 # running a simulation
 tspan =np.linspace(0, 4e3, 1000)
 retrive_c = 'in_out'
-results = modeler.run_sim(tspan,
-                          retrive_c=retrive_c,
-                          keep_files=False)
+results = modeler.run_sim(tspan, retrive_c=retrive_c)
 
 if retrive_c == 'in_out':
 
@@ -89,9 +83,6 @@ else:
 
     for cname in results.components:
         to_plot = results.C.sel(component=cname)
-
-        #to_q = results.Q.sel(component=cname)
-        #to_plot = to_q.sel(col_loc=0.0)
         to_plot.plot()
         plt.show()
 

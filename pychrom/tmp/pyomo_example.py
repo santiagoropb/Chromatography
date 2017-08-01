@@ -108,7 +108,7 @@ for cname in components:
         plt.plot(time, traj)
 plt.show()
 
-results = modeler.run_sim(solver_opts={'halt_on_ampl_error':'yes'})
+results = modeler.solve(solver_opts={'halt_on_ampl_error':'yes'})
 
 plt.figure()
 

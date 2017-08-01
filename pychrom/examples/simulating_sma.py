@@ -1,8 +1,5 @@
-from pychrom.core.chromatograpy_model import GRModel
-from pychrom.core.section import Section
-from pychrom.core.unit_operation import Inlet, Column, Outlet
-from pychrom.core.binding_model import SMABinding
 from pychrom.modeling.cadet_modeler import CadetModeler
+from pychrom.core import *
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 
@@ -52,17 +49,12 @@ GRM.connect_unit_operations('column', 'outlet')
 
 # create a modeler
 modeler = CadetModeler(GRM)
-ncol=50
-npar=10
-modeler.discretize_column('column', ncol, npar)
+modeler.discretize_column('column', ncol=50, npar=10)
 
 # running a simulation
 tspan = range(1500)
 retrive_c = 'all'
-results = modeler.run_sim(tspan,
-                          retrive_c=retrive_c,
-                          keep_files=False)
-
+results = modeler.run_sim(tspan, retrive_c=retrive_c)
 
 if retrive_c == 'in_out':
 
@@ -78,19 +70,11 @@ if retrive_c == 'in_out':
 else:
 
     for cname in results.components:
-        #to_plot = results.C.sel(component=cname)
-
-        to_q = results.Q.sel(component=cname)
-        to_plot = to_q.sel(col_loc=0.0)
-        for t in results.times:
-            for x in results.col_locs:
-                for r in results.par_locs:
-                    print(cname, float(to_q.sel(time=t, col_loc=x, par_loc=r)))
-
+        to_plot = results.C.sel(component=cname)
         to_plot.plot()
         plt.show()
 
-    """
+
     fig = plt.figure()
     ax1 = fig.add_subplot(1, 1, 1)
     textos = []
@@ -113,4 +97,4 @@ else:
     n_locations = len(results.C.coords['col_loc'])
     ani = animation.FuncAnimation(fig, animate, interval=n_locations)
     plt.show()
-    """
+

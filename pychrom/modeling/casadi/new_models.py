@@ -179,7 +179,7 @@ class CasadiColumn(object):
         bm = self._column.binding_model
         s_no_salt = [s for s in self.m.s if not bm.is_salt(s)]
 
-        if len(s_no_salt) == self.m.s:
+        if len(s_no_salt) == len(self.m.s):
             salt_name = "no_salt_name"
         else:
             sno = set(s_no_salt)

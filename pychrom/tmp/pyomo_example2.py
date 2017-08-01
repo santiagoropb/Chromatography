@@ -1,14 +1,8 @@
-from pychrom.core.chromatograpy_model import GRModel
-from pychrom.core.section import Section
-from pychrom.core.unit_operation import Inlet, Column, Outlet
-from pychrom.core.binding_model import SMABinding
 from pychrom.modeling.pyomo_modeler import PyomoModeler
-from pychrom.modeling.cadet_modeler import CadetModeler
-import matplotlib.animation as animation
+from pychrom.core import *
 from itertools import combinations
 import pyomo.environ as pe
 import pyomo.dae as dae
-
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -155,6 +149,28 @@ def rule_variance(m,s):
 
 m.variance = pe.Constraint(no_salt_list, rule=rule_variance)
 
+# defines states for standard deviation
+m.skews = pe.Var(no_salt_list, m.t)
+m.dskews = dae.DerivativeVar(m.skews, wrt=m.t)
+
+def rule_skews(m,s,t):
+    if t == m.t.first():
+        return pe.Constraint.Skip
+    eps = 1e-4
+    std = (m.variance_t[s]**2+eps)**0.5
+    return m.dskews[s, t] == m.C[s, t, m.x.last()] * ((t - m.miu_t[s])/std) ** 3
+m.skew_integral = pe.Constraint(no_salt_list, m.t, rule=rule_skews)
+
+def init_skew_rule(m, s):
+    return m.skews[s, m.t.first()] == 0.0
+m.init_skews = pe.Constraint(no_salt_list, rule=init_skew_rule)
+
+# skew variable
+m.skew_t = pe.Var(no_salt_list, initialize=1.0)
+def rule_skewness(m,s):
+    return m.Cts[s, m.t.last()]*m.skew_t[s] == m.skews[s, m.t.last()]
+m.skewness = pe.Constraint(no_salt_list, rule=rule_skewness)
+
 # combination of components into tuples
 combined_components = list(combinations(no_salt_list, 2))
 n_combinations = len(combined_components)
@@ -172,14 +188,13 @@ for i, p in enumerate(combined_components):
 print("done building")
 modeler.discretize_space(30)
 print("done discretizing space")
-modeler.discretize_time(60)
+modeler.discretize_time(60, 1)
 print("done discretizing time")
-
 
 modeler.initialize_variables()
 
 options = {'constr_viol_tol': 6e-4, 'halt_on_ampl_error': 'yes'}
-results = modeler.run_sim(solver_opts=options)
+results = modeler.solve(solver_opts=options)
 
 fig = plt.figure()
 ax1 = fig.add_subplot(1, 1, 1)
@@ -191,9 +206,7 @@ components = results.C.coords['component']
 for cname in no_salt_list:
     print(cname, pe.value(m.miu_t[cname]),
           pe.value(m.variance_t[cname]**0.5),
-          pe.value(m.Cts[cname, m.t.last()]),
-          pe.value(m.Trs[cname, m.t.last()]),
-          pe.value(m.sigmas[cname, m.t.last()]))
+          pe.value(m.skew_t[cname]))
 
 m.resolution.pprint()
 

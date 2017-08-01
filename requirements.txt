@@ -7,3 +7,4 @@ six==1.10.0
 Pint==0.8.1
 coverage==4.4.1
 tabulate
+xarray

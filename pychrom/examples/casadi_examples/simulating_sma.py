@@ -1,7 +1,4 @@
-from pychrom.core.chromatograpy_model import GRModel
-from pychrom.core.section import Section
-from pychrom.core.unit_operation import Inlet, Column, Outlet
-from pychrom.core.binding_model import SMABinding
+from pychrom.core import *
 from pychrom.modeling.casadi_modeler import CasadiModeler
 import matplotlib.pyplot as plt
 import numpy as np
@@ -62,12 +59,9 @@ GRM.connect_unit_operations('column', 'outlet')
 modeler = CasadiModeler(GRM)
 lspan = np.linspace(0, GRM.column.length, 4)
 
-#modeler.build_model(lspan, model_type='ConvectionModel')
-#modeler.build_model(lspan, model_type='DispersionModel')
 modeler.build_model(lspan, model_type='IdealConvectiveColumn')
 
 
-#sys.exit()
 tspan = np.linspace(0, 1500, 3)
 results = modeler.run_sim(tspan)
 
@@ -75,6 +69,4 @@ for cname in results.components:
     to_plot = results.C.sel(component=cname)
     to_plot.plot()
 
-    #plot2d = to_plot.sel(location=0.0)
-    #plt.plot(plot2d.time, plot2d)
     plt.show()

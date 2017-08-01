@@ -1,6 +1,6 @@
 from pychrom.modeling.pyomo.models import IdealConvectiveColumn, ConvectionModel
 from pychrom.modeling.pyomo.models import IdealDispersiveColumn, DispersionModel
-from pychrom.modeling.pyomo.models import IdealConvectiveColumn2
+from pychrom.modeling.pyomo.models import OptimalConvectiveColumn
 from pychrom.core.unit_operation import Column
 import pyomo.environ as pe
 import warnings
@@ -68,11 +68,11 @@ class PyomoModeler(object):
         elif model_type == 'IdealConvectiveModel':
             self.pyomo_column = IdealConvectiveColumn(self._column)
             self.pyomo_column.build_pyomo_model(tspan, lspan=lspan, rspan=None, **options)
-        elif model_type == 'IdealConvectiveModel2':
-            self.pyomo_column = IdealConvectiveColumn2(self._column)
-            self.pyomo_column.build_pyomo_model(tspan, lspan=lspan, rspan=None, **options)
         elif model_type == 'IdealDispersiveModel':
             self.pyomo_column = IdealDispersiveColumn(self._column)
+            self.pyomo_column.build_pyomo_model(tspan, lspan=lspan, rspan=None, **options)
+        elif model_type == 'OptimalConvectiveModel':
+            self.pyomo_column = OptimalConvectiveColumn(self._column)
             self.pyomo_column.build_pyomo_model(tspan, lspan=lspan, rspan=None, **options)
         else:
             raise NotImplementedError("Model not supported yet")
@@ -108,7 +108,7 @@ class PyomoModeler(object):
     def initialize_variables(self, trajectories=None):
         self.pyomo_column.initialize_variables(trajectories=trajectories)
 
-    def run_sim(self,
+    def solve(self,
                 solver='ipopt',
                 solver_opts=None):
 
