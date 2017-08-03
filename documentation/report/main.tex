@@ -67,9 +67,13 @@ For rapid prototyping and testing of ideas towards the goal of robust optimizati
 
 \section{Chromatography models}
 
-Different types of modeling approaches for chromatography columns are comprehensively summarized in the work done by Guiochon et al. (2006). In this report we give only a brief overview of the models presented there.
-In general, most chromatography models take into account one or
-more of the following effects:
+Different types of modeling approaches for chromatography columns are comprehensively summarized in the work done by Guiochon et al. (2006). In this report we give only a brief overview of the models presented there. In general, most chromatography models take into account one or more of the following effects:
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.55\textwidth]{diagramtransport.png}
+\caption{Effects considered in chromatography model. Taken from Smith XX}
+\end{figure}
 
 \begin{itemize}
 \item convection
@@ -83,11 +87,13 @@ more of the following effects:
 In modeling liquid chromatographic processes, frequently different assumptions can be justified which lead to simplification in the mathematical models. The simplest model, known as the ideal model, neglects dispersion, pore and surface diffusion and mass transfer effects. On the other extreme, the most accurate model, known as the General Rate Model (GRM), consider all the phenomena listed above. In between, several models have been introduced in literature and are known as lumped transport models. Figure XX shows a simple diagram with the high-level classification of chromatography models and its corresponding variables.
 
 Where $C$ represents the concentration in the mobile phase, $Cp$ the concentration in the pores of a bead, and $Q$ the concentration in the bead. For simplicity we describe here only the ideal model. Further details on more accurate models can be found in Guiochon et al. (2006) and Lieres and Andersson, 2010.
-\begin{equation}
-1
-\end{equation}
 
-Given that the ideal model is the simplest model, and since it consist on solving a system of partial differential algebraic equations PDAEs, transport lumped models and the GRM also solve a ssytem PDAEs, however, more complex and with larger dimensionality. Despite its simplifications this ideal model is a good model to experiment and try ideas for the rigorous optimization.  
+\begin{align}
+& \frac{dc}{dt} = \left(\frac{1-\epsilon}{\epsilon}\right) \frac{dQ}{dt}-v\frac{dc}{dx} + D\frac{d^2C}{dx^2}\\
+& a \frac{dQ}{dt} = f_{\text{ads}}(C,Q)
+\end{align}
+
+Given that the ideal model is the simplest model, and that it consist on a system of partial differential algebraic equations PDAEs, transport lumped models and the GRM are also system PDAEs, however, more complex and with a larger dimensionality. Despite its simplifications this ideal model is a good model to experiment and try ideas for the rigorous optimization.  
 \\
 \\
 In pychrom the simulation of a chromatography columns can be done very efficiently with the GRM. A chromatography model is built in python and sent to the C++ software CADET, The Chromatography Analysis and Design Toolkit, to simulate the system. All the results are latter parsed and loaded into xarrays for easy post-processing in python
