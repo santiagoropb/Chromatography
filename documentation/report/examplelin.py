@@ -76,8 +76,6 @@ if retrive_c == 'in_out':
             if cname != 'salt':
                 traj = results.C.sel(time=time, col_loc=l, component=cname)
                 plt.plot(time, traj)
-        plt.xlabel("time")
-        plt.ylabel("concentration")
         plt.show()
 
 else:
@@ -86,28 +84,3 @@ else:
         to_plot = results.C.sel(component=cname)
         to_plot.plot()
         plt.show()
-
-    """
-    fig = plt.figure()
-    ax1 = fig.add_subplot(1, 1, 1)
-    textos = []
-
-    def animate(l):
-        time = results.C.coords['time']
-        components = results.C.coords['component']
-        loc = results.C.coords['col_loc'][l]
-        print(loc)
-        ax1.clear()
-        for cname in components:
-            if cname != 'salt':
-                traj = results.C.sel(time=time, col_loc=loc, component=cname)
-                ax1.plot(time, traj)
-        texto = fig.text(0, 0, 'Location {:.3}'.format(float(loc)))
-        textos.append(texto)
-        if l>1:
-            textos[l-1].remove()
-
-    n_locations = len(results.C.coords['col_loc'])
-    ani = animation.FuncAnimation(fig, animate, interval=n_locations)
-    plt.show()
-    """

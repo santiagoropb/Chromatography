@@ -1,55 +1,44 @@
-
 from pychrom.modeling.cadet_modeler import CadetModeler
 from pychrom.core import *
+import matplotlib.animation as animation
 import matplotlib.pyplot as plt
-import numpy as np
 
-comps = ['A', 'B']
+comps = ['salt',
+         'lysozyme',
+         'cytochrome',
+         'ribonuclease']
 
 GRM = GRModel(components=comps)
 
 # create sections
-GRM.sec0 = Section(components=comps)
-for cname in GRM.list_components():
-    GRM.sec0.set_a0(cname, 0.00714)
-GRM.sec0.start_time_sec = 0.0
+GRM.load = Section(components=comps)
+for cname in comps:
+    GRM.load.set_a0(cname, 1.0)
+GRM.load.set_a0('salt', 50.0)
+GRM.load.start_time_sec = 0.0
 
-GRM.sec1 = Section(components=comps)
-GRM.sec1.start_time_sec = 10.0
+GRM.wash = Section(components=comps)
+GRM.wash.set_a0('salt', 50.0)
+GRM.wash.start_time_sec = 10.0
+
+GRM.elute = Section(components=comps)
+GRM.elute.set_a0('salt', 100.0)
+GRM.elute.set_a1('salt', 0.2)
+GRM.elute.start_time_sec = 90.0
 
 # create inlet
 GRM.inlet = Inlet(components=comps)
-GRM.inlet.add_section('sec0')
-GRM.inlet.add_section('sec1')
+GRM.inlet.add_section('load')
+GRM.inlet.add_section('wash')
+GRM.inlet.add_section('elute')
 
-GRM.column = Column(components=comps)
+# create binding
+GRM.salt = 'salt'
+GRM.binding = SMABinding(data="sma.yml")
+GRM.binding.is_kinetic = True
 
-# defining adsorption
-GRM.adsorption = LinearBinding(components=comps)
-binding = GRM.adsorption
-binding.is_kinetic = False
-binding.set_ka('A', 1.14)
-binding.set_kd('A', 0.02)
-binding.set_ka('B', 0.98)
-binding.set_kd('B', 0.01)
-
-# defining column
-column = GRM.column
-column.dispersion = 5.75e-08
-column.length = 0.014
-column.column_porosity = 0.37
-
-# component A
-column.set_film_diffusion('A', 6.90000000e-06)
-column.set_par_diffusion('A', 6.07000000e-11)
-# component B
-column.set_film_diffusion('B', 6.90000000e-06)
-column.set_par_diffusion('B', 6.07000000e-11)
-
-column.particle_porosity = 0.75
-column.particle_radius = 4.5e-05
-column.velocity = 0.000575
-column.binding_model = binding
+# create column
+GRM.column = Column(data="column.yml")
 
 # create outlet
 GRM.outlet = Outlet(components=comps)
@@ -60,11 +49,11 @@ GRM.connect_unit_operations('column', 'outlet')
 
 # create a modeler
 modeler = CadetModeler(GRM)
-modeler.discretize_column('column', ncol=50, npar=5)
+modeler.discretize_column('column', ncol=50, npar=10)
 
 # running a simulation
-tspan =np.linspace(0, 4e3, 1000)
-retrive_c = 'in_out'
+tspan = range(1500)
+retrive_c = 'all'
 results = modeler.run_sim(tspan, retrive_c=retrive_c)
 
 if retrive_c == 'in_out':
@@ -76,8 +65,6 @@ if retrive_c == 'in_out':
             if cname != 'salt':
                 traj = results.C.sel(time=time, col_loc=l, component=cname)
                 plt.plot(time, traj)
-        plt.xlabel("time")
-        plt.ylabel("concentration")
         plt.show()
 
 else:
@@ -87,7 +74,7 @@ else:
         to_plot.plot()
         plt.show()
 
-    """
+
     fig = plt.figure()
     ax1 = fig.add_subplot(1, 1, 1)
     textos = []
@@ -110,4 +97,4 @@ else:
     n_locations = len(results.C.coords['col_loc'])
     ani = animation.FuncAnimation(fig, animate, interval=n_locations)
     plt.show()
-    """
+
