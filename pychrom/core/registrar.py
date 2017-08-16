@@ -223,3 +223,32 @@ class Registrar(object):
     for p, v in adsorption_parameters['lin']['index def'].items():
         default_scalar_parameters[p] = v
 
+    ########## EQSMA
+    adsorption_parameters['eqsma'] = dict()
+    adsorption_parameters['eqsma']['scalar'] = set()
+    adsorption_parameters['eqsma']['index'] = set()
+
+    adsorption_parameters['eqsma']['scalar def'] = dict()
+    adsorption_parameters['eqsma']['index def'] = dict()
+
+    # parameters
+    # scalar
+    adsorption_parameters['eqsma']['scalar'].add('eqsma_lambda')
+
+    for p in adsorption_parameters['eqsma']['scalar']:
+        scalar_parameters.add(p)
+
+    for p, v in adsorption_parameters['eqsma']['scalar def'].items():
+        default_scalar_parameters[p] = v
+
+    # index parameters
+    adsorption_parameters['eqsma']['index'].add('eqsma_km')
+    adsorption_parameters['eqsma']['index'].add('eqsma_ke')
+    adsorption_parameters['eqsma']['index'].add('eqsma_nu')
+    adsorption_parameters['eqsma']['index'].add('eqsma_sigma')
+
+    for p in adsorption_parameters['eqsma']['index']:
+        single_index_parameters.add(p)
+
+    for p, v in adsorption_parameters['eqsma']['index def'].items():
+        default_scalar_parameters[p] = v

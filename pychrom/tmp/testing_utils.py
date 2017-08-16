@@ -98,7 +98,7 @@ def add_integral_variables(model, modeler, n_moments=1, mass_integrals=None):
         m.Trs = pe.Var(no_salt_list, m.t, initialize=1.0)
         m.dTrs = dae.DerivativeVar(m.Trs, wrt=m.t)
 
-        def rule_total_time(m,s,t):
+        def rule_total_time(m, s, t):
             if t == m.t.first():
                 return pe.Constraint.Skip
             return m.dTrs[s, t] == m.C[s, t, m.x.last()]*t
@@ -182,10 +182,46 @@ def create_resolution_variables(model, modeler, combined_components):
         s1 = p[0]
         s2 = p[1]
         eps = 1e-5
-        w1 = 4*(m.variance_t[s1] ** 2+eps) ** 0.5
-        w2 = 4*(m.variance_t[s2] ** 2+eps) ** 0.5
-        m.list_resolutions.add(m.resolution[p] == 2.0*(m.mean_t[s1]-m.mean_t[s2])/(w1+w2))
+        #w1 = 4*((m.variance_t[s1]**2+eps) ** 0.5)**0.5
+        #w2 = 4*((m.variance_t[s2]**2+eps) ** 0.5)**0.5
+        #m.list_resolutions.add(m.resolution[p] == 2.0*(m.mean_t[s1]-m.mean_t[s2])/(w1+w2))
+        m.list_resolutions.add(m.resolution[p] == ((m.mean_t[s1] - m.mean_t[s2])**2+1e-4)**0.5)
 
 
+def add_performance_variables(model, modeler, start, stop, desired, mass_integrals):
 
+    m = modeler.pyomo_column.pyomo_model()
+    no_salt_list = [cname for cname in model.list_components() if not model.is_salt(cname)]
 
+    # defines states for total concentrations
+    m.Ccollect = pe.Var(no_salt_list, m.t, initialize=1.0)
+    m.dCcollect = dae.DerivativeVar(m.Ccollect, wrt=m.t)
+
+    def rule_collect(m,s,t):
+        if start <= t <= stop:
+            return m.dCcollect[s, t] == m.C[s, t, m.x.last()]
+        else:
+            return m.dCcollect[s, t] == 0.0
+    m.c_integral_collect = pe.Constraint(no_salt_list, m.t, rule=rule_collect)
+
+    def init_collect_rule(m, s):
+        return m.Ccollect[s, m.t.first()] == 0.0
+    m.init_collect = pe.Constraint(no_salt_list, rule=init_collect_rule)
+
+    m.purity = pe.Var()
+
+    def purity_rule(m):
+        desired_integral = sum(m.Ccollect[s, m.t.last()] for s in desired)
+        all_integral = sum(m.Ccollect[s, m.t.last()] for s in no_salt_list)
+        return m.purity*all_integral == desired_integral
+
+    m.purity_constraint = pe.Constraint(rule=purity_rule)
+
+    m.y = pe.Var()
+
+    def rule_yield(m):
+        desired_integral = sum(m.Ccollect[s, m.t.last()] for s in desired)
+        all_integral = sum(mass_integrals[s] for s in no_salt_list)
+        return m.y*all_integral == desired_integral
+
+    m.yield_constraint = pe.Constraint(rule=rule_yield)

@@ -292,7 +292,7 @@ class MCLBinding(BindingModel):
 
 
 @BindingModel.register
-class SMABinding(BindingModel):
+class EQSMABinding(BindingModel):
 
     def __init__(self, data=None, **kwargs):
 
@@ -300,17 +300,17 @@ class SMABinding(BindingModel):
         super().__init__(data=data, **kwargs)
 
         self._registered_scalar_parameters = \
-            Registrar.adsorption_parameters['sma']['scalar']
+            Registrar.adsorption_parameters['eqsma']['scalar']
 
         self._registered_index_parameters = \
-            Registrar.adsorption_parameters['sma']['index']
+            Registrar.adsorption_parameters['eqsma']['index']
 
         # set defaults
         self._default_scalar_params = \
-            Registrar.adsorption_parameters['sma']['scalar def']
+            Registrar.adsorption_parameters['eqsma']['scalar def']
 
         self._default_index_params = \
-            Registrar.adsorption_parameters['sma']['index def']
+            Registrar.adsorption_parameters['eqsma']['index def']
 
         self._binding_type = BindingType.STERIC_MASS_ACTION
 
@@ -327,51 +327,33 @@ class SMABinding(BindingModel):
     def is_salt(self, name):
         return self._model().is_salt(name)
 
-    def ka(self, comp_name):
-        return self.get_index_parameter(comp_name, 'sma_ka')
+    def km(self, comp_name):
+        return self.get_index_parameter(comp_name, 'eqsma_km')
 
-    def kd(self, comp_name):
-        return self.get_index_parameter(comp_name, 'sma_kd')
+    def ke(self, comp_name):
+        return self.get_index_parameter(comp_name, 'eqsma_ke')
 
     def nu(self, comp_name):
-        return self.get_index_parameter(comp_name, 'sma_nu')
+        return self.get_index_parameter(comp_name, 'eqsma_nu')
 
     def sigma(self, comp_name):
-        return self.get_index_parameter(comp_name, 'sma_sigma')
+        return self.get_index_parameter(comp_name, 'eqsma_sigma')
 
-    def set_ka(self, comp_name, value):
-        self.set_index_parameter(comp_name, 'sma_ka', value)
+    def set_km(self, comp_name, value):
+        self.set_index_parameter(comp_name, 'eqsma_km', value)
 
-    def set_kd(self, comp_name, value):
-        self.set_index_parameter(comp_name, 'sma_kd', value)
+    def set_ke(self, comp_name, value):
+        self.set_index_parameter(comp_name, 'eqsma_ke', value)
 
     def set_nu(self, comp_name, value):
-        self.set_index_parameter(comp_name, 'sma_nu', value)
+        self.set_index_parameter(comp_name, 'eqsma_nu', value)
 
     def set_sigma(self, comp_name, value):
-        self.set_index_parameter(comp_name, 'sma_sigma', value)
+        self.set_index_parameter(comp_name, 'eqsma_sigma', value)
 
     def _write_to_cadet_input_file(self, filename, unitname, **kwargs):
 
-        super()._write_to_cadet_input_file(filename, unitname, **kwargs)
-
-        assert self._model().salt is not None, "Salt must be defined in chromatography model"
-
-        with h5py.File(filename, 'a') as f:
-            subgroup_name = os.path.join("input", "model", unitname)
-            subgroup = f[subgroup_name]
-            adsorption = subgroup['adsorption']
-
-            # scalar parameters
-            double_scalars = ['sma_cref', 'sma_qref']
-            int_scalars = ['sma_lambda']
-
-            # index parameters
-            double_index = ['sma_ka', 'sma_kd', 'sma_nu', 'sma_sigma']
-            self._cadet_writer_helper(adsorption,
-                                      int_scalars=int_scalars,
-                                      double_scalars=double_scalars,
-                                      double_index=double_index)
+        raise NotImplementedError("binding not supported")
 
     def f_ads(self, comp_name, c_vars, q_vars, **kwargs):
         """
@@ -422,194 +404,335 @@ class SMABinding(BindingModel):
             else:
                 c_salt = c_vars[self.salt]
 
-            ads = self.ka(comp_name) * c_vars[comp_name] * q_free_sites ** self.nu(comp_name)
-            des = self.kd(comp_name) * q_vars[comp_name] * c_salt ** self.nu(comp_name)
-            return ads - des
+            Qeq = c_vars[comp_name]*self.ke(comp_name)*(q_free_sites/c_salt)**self.nu(comp_name)
+            return self.km(comp_name)*(Qeq-q_vars[comp_name])
 
-    def f_ads2(self, comp_name, c_vars, q_vars, **kwargs):
-        self._check_model()
-        q_ref = kwargs.pop('q_ref', 1.0)
+    @property
+    def lamda(self):
+        return self.get_scalar_parameter('eqsma_lambda')
 
-        if not self.is_fully_specified():
-            self.is_fully_specified(print_out=True)
-            raise RuntimeError("Missing parameters")
+    @lamda.setter
+    def lamda(self, value):
+        self.set_scalar_parameter('eqsma_lambda', value)
 
-        _scalar_params = self.get_scalar_parameters(with_defaults=True)
+@BindingModel.register
+class SMABinding(BindingModel):
 
-        assert self._model().salt is not None, "Salt must be defined in chromatography model"
+        def __init__(self, data=None, **kwargs):
 
-        # get list components
-        components = self._model().list_components()
-        # determine if salt
-        is_salt = self._model().is_salt(comp_name)
-        salt_name = self._model().salt
+            # call parent binding model constructor
+            super().__init__(data=data, **kwargs)
 
-        loop_nosalt = [n for n in components if n != salt_name]
-        q_0 = _scalar_params['sma_lambda']
+            self._registered_scalar_parameters = \
+                Registrar.adsorption_parameters['sma']['scalar']
 
-        # compute free salt
-        for cname in loop_nosalt:
-            vj = self.nu(cname)
-            sj = self.sigma(cname)
-            q_0 -= (vj+sj)*q_vars[cname]
-        if comp_name == salt_name:
-            return q_0
+            self._registered_index_parameters = \
+                Registrar.adsorption_parameters['sma']['index']
 
-        ka = self.ka(comp_name)
-        vi = self.nu(comp_name)
-        adsorption = ka * c_vars[comp_name] * (q_vars[salt_name]) ** vi
+            # set defaults
+            self._default_scalar_params = \
+                Registrar.adsorption_parameters['sma']['scalar def']
 
-        # desorption term
-        kd = self.kd(comp_name)
-        desorption = kd * q_vars[comp_name] * (c_vars[salt_name]) ** vi
+            self._default_index_params = \
+                Registrar.adsorption_parameters['sma']['index def']
 
-        return adsorption - desorption
+            self._binding_type = BindingType.STERIC_MASS_ACTION
 
-    def f_ads_given_free_sites(self, comp_name, c_vars, q_vars, free_sites_var, **kwargs):
-        """
-        Computes adsorption function for component comp_id
-        :param comp_name: name of component of interest
-        :param c_vars: dictionary from comp_id to variable. Either value or pyomo variable
-        :param q_vars: dictionary from comp_id to variable. Either value or pyomo variable
-        :param unfix_params: dictionary from parameter name to variable. Either value or pyomo variable
-        :return: expression if pyomo variable or scalar value
-        """
+        @property
+        def salt(self):
+            return self._model().salt
 
-        unfixed_index_params = kwargs.pop('unfixed_index_params', None)
-        unfixed_scalar_params = kwargs.pop('unfixed_scalar_params', None)
-        scale_vars = kwargs.pop('scale_vars', None)
-        smoothing = kwargs.pop('smmothing', True)
+        @salt.setter
+        def salt(self, name):
+            msg = "binding model cannot set salt. "
+            msg += "Set the salt from the Chromatography model"
+            raise RuntimeError(msg)
 
-        if unfixed_index_params is not None or unfixed_scalar_params is not None:
-            raise NotImplementedError()
+        def is_salt(self, name):
+            return self._model().is_salt(name)
 
-        if scale_vars is not None:
-            raise NotImplementedError()
+        def ka(self, comp_name):
+            return self.get_index_parameter(comp_name, 'sma_ka')
 
-        if not self.is_fully_specified():
-            print(self.get_index_parameters())
-            raise RuntimeError("Missing parameters")
+        def kd(self, comp_name):
+            return self.get_index_parameter(comp_name, 'sma_kd')
 
-        _scalar_params = self.get_scalar_parameters(with_defaults=True)
+        def nu(self, comp_name):
+            return self.get_index_parameter(comp_name, 'sma_nu')
 
-        assert self._model().salt is not None, "Salt must be defined in chromatography model"
+        def sigma(self, comp_name):
+            return self.get_index_parameter(comp_name, 'sma_sigma')
 
-        # get list components
-        components = self._model().list_components()
-        # determine if salt
-        is_salt = self._model().is_salt(comp_name)
-        salt_name = self._model().salt
+        def set_ka(self, comp_name, value):
+            self.set_index_parameter(comp_name, 'sma_ka', value)
 
-        if comp_name == 'free_sites' or is_salt:
-            loop_nosalt = [n for n in components if n != salt_name]
-            q_0 = _scalar_params['sma_lambda']
-            for cname in loop_nosalt:
-                vj = self.nu(cname)
-                q_0 -= vj * q_vars[cname]
+        def set_kd(self, comp_name, value):
+            self.set_index_parameter(comp_name, 'sma_kd', value)
 
-            if is_salt:
-                return q_0
+        def set_nu(self, comp_name, value):
+            self.set_index_parameter(comp_name, 'sma_nu', value)
 
-            q_0_bar = q_vars[salt_name]
-            for cname in loop_nosalt:
-                sj = self.sigma(cname)
-                q_0_bar -= sj * q_vars[cname]
+        def set_sigma(self, comp_name, value):
+            self.set_index_parameter(comp_name, 'sma_sigma', value)
 
-            if comp_name == 'free_sites':
-                return q_0_bar
+        def _write_to_cadet_input_file(self, filename, unitname, **kwargs):
 
-        # scale q_0_bar
-        gamma_0_bar = free_sites_var
+            super()._write_to_cadet_input_file(filename, unitname, **kwargs)
 
-        if smoothing:
-            eps = 1e-3
-            eps2 = 1e-3
-            #gamma_0_bar = 0.5 * (1 + gamma_0_bar / (gamma_0_bar ** 2 + eps ** 2) ** 0.5) * gamma_0_bar + eps2
-            #c_salt = 0.5 * (1 + c_vars[self.salt] / (c_vars[self.salt] ** 2 + eps ** 2) ** 0.5) * c_vars[self.salt] + eps2
+            assert self._model().salt is not None, "Salt must be defined in chromatography model"
 
-            eps = 1e-4
-            gamma_0_bar = (gamma_0_bar**2+eps)**0.5
-            c_salt = (c_vars[self.salt]**2+eps)**0.5
+            with h5py.File(filename, 'a') as f:
+                subgroup_name = os.path.join("input", "model", unitname)
+                subgroup = f[subgroup_name]
+                adsorption = subgroup['adsorption']
 
-        else:
-            c_salt = c_vars[self.salt]
+                # scalar parameters
+                double_scalars = ['sma_cref', 'sma_qref']
+                int_scalars = ['sma_lambda']
 
-        # adsorption term
-        ka = self.ka(comp_name)
-        vi = self.nu(comp_name)
-        adsorption = ka * c_vars[comp_name] * gamma_0_bar ** vi
+                # index parameters
+                double_index = ['sma_ka', 'sma_kd', 'sma_nu', 'sma_sigma']
+                self._cadet_writer_helper(adsorption,
+                                          int_scalars=int_scalars,
+                                          double_scalars=double_scalars,
+                                          double_index=double_index)
 
-        # desorption term
-        kd = self.kd(comp_name)
-        desorption = kd * q_vars[comp_name] * c_salt ** vi
+        def f_ads(self, comp_name, c_vars, q_vars, **kwargs):
+            """
+            Computes adsorption function for component comp_id
+            :param comp_name: name of component of interest
+            :param c_vars: dictionary from comp_id to variable. Either value or pyomo variable
+            :param q_vars: dictionary from comp_id to variable. Either value or pyomo variable
+            :return: expression if pyomo variable or scalar value
+            """
+            self._check_model()
 
-        return adsorption - desorption
+            assert self._model().salt is not None, "Salt must be defined in chromatography model"
 
-    def new_fads(self, comp_name, c_vars, q_vars, **kwargs):
+            if not self.is_fully_specified():
+                self.is_fully_specified(print_out=True)
+                raise RuntimeError("Missing parameters")
 
-        free_sites = kwargs.pop('fs', None)
-        smoothing = kwargs.pop('smmothing', True)
+            free_sites = kwargs.pop('fs', None)
+            smoothing = kwargs.pop('smoothing', True)
 
-        no_salt_list = [cname for cname in self.list_components() if not self.is_salt(cname)]
-        if self.is_salt(comp_name):
-            q_salt = self.lamda
-            for n in no_salt_list:
-                qj = q_vars[n]
-                q_salt -= self.nu(n)*qj
-            return q_salt - q_vars[comp_name]
-        elif comp_name == 'free_sites':
-            if free_sites is None:
-                raise RuntimeError('Need to provide fs')
-            else:
+            no_salt_list = [cname for cname in self.list_components() if not self.is_salt(cname)]
+
+            if self.is_salt(comp_name):
+                q_salt = self.lamda
+                for n in no_salt_list:
+                    qj = q_vars[n]
+                    q_salt -= self.nu(n) * qj
+                return q_salt
+            elif comp_name == 'free_sites':
                 q_free_sites = q_vars[self.salt]
                 for n in no_salt_list:
                     qj = q_vars[n]
                     q_free_sites -= self.sigma(n) * qj
-                return q_free_sites - free_sites
-        else:
-            if free_sites is None:
-                q_free_sites = self.lamda
-                for n in no_salt_list:
-                    qj = q_vars[n]
-                    q_free_sites -= (self.nu(n) + self.sigma(n)) * qj
-
-                if smoothing:
-                    eps = 1e-3
-                    eps2 = 1e-9
-                    q_free_sites = 0.5 * (1 + q_free_sites / (q_free_sites ** 2 + eps ** 2) ** 0.5) * q_free_sites + eps2
-                    c_salt = 0.5 * (1 + c_vars[self.salt] / (c_vars[self.salt] ** 2 + eps ** 2) ** 0.5) * c_vars[self.salt] + eps2
-                else:
-                    c_salt = c_vars[self.salt]
-
-                ads = self.ka(comp_name)*c_vars[comp_name]*q_free_sites**self.nu(comp_name)
-                des = self.kd(comp_name)*q_vars[comp_name]*c_salt**self.nu(comp_name)
-
+                return q_free_sites
             else:
-                q_free_sites = free_sites
+                if free_sites is None:
+                    q_free_sites = q_vars[self.salt]
+                    for n in no_salt_list:
+                        qj = q_vars[n]
+                        q_free_sites -= self.sigma(n) * qj
+                else:
+                    q_free_sites = free_sites
+
                 if smoothing:
-                    eps = 1e-3
-                    eps2 = 1e-9
-                    q_free_sites = 0.5 * (1 + q_free_sites / (q_free_sites ** 2 + eps ** 2) ** 0.5) * q_free_sites + eps2
-                    c_salt = 0.5 * (1 + c_vars[self.salt] / (c_vars[self.salt] ** 2 + eps ** 2) ** 0.5) * c_vars[self.salt] +eps2
+                    eps = 1e-4
+                    q_free_sites = (q_free_sites ** 2 + eps) ** 0.5
+                    c_salt = (c_vars[self.salt] ** 2 + eps) ** 0.5
                 else:
                     c_salt = c_vars[self.salt]
+
                 ads = self.ka(comp_name) * c_vars[comp_name] * q_free_sites ** self.nu(comp_name)
                 des = self.kd(comp_name) * q_vars[comp_name] * c_salt ** self.nu(comp_name)
+                return ads - des
 
-            return ads - des
+        def f_ads2(self, comp_name, c_vars, q_vars, **kwargs):
+            self._check_model()
+            q_ref = kwargs.pop('q_ref', 1.0)
 
+            if not self.is_fully_specified():
+                self.is_fully_specified(print_out=True)
+                raise RuntimeError("Missing parameters")
 
+            _scalar_params = self.get_scalar_parameters(with_defaults=True)
 
-    @property
-    def lamda(self):
-        return self.get_scalar_parameter('sma_lambda')
+            assert self._model().salt is not None, "Salt must be defined in chromatography model"
 
-    @lamda.setter
-    def lamda(self, value):
-        self.set_scalar_parameter('sma_lambda', value)
+            # get list components
+            components = self._model().list_components()
+            # determine if salt
+            is_salt = self._model().is_salt(comp_name)
+            salt_name = self._model().salt
 
+            loop_nosalt = [n for n in components if n != salt_name]
+            q_0 = _scalar_params['sma_lambda']
 
+            # compute free salt
+            for cname in loop_nosalt:
+                vj = self.nu(cname)
+                sj = self.sigma(cname)
+                q_0 -= (vj + sj) * q_vars[cname]
+            if comp_name == salt_name:
+                return q_0
 
+            ka = self.ka(comp_name)
+            vi = self.nu(comp_name)
+            adsorption = ka * c_vars[comp_name] * (q_vars[salt_name]) ** vi
+
+            # desorption term
+            kd = self.kd(comp_name)
+            desorption = kd * q_vars[comp_name] * (c_vars[salt_name]) ** vi
+
+            return adsorption - desorption
+
+        def f_ads_given_free_sites(self, comp_name, c_vars, q_vars, free_sites_var, **kwargs):
+            """
+            Computes adsorption function for component comp_id
+            :param comp_name: name of component of interest
+            :param c_vars: dictionary from comp_id to variable. Either value or pyomo variable
+            :param q_vars: dictionary from comp_id to variable. Either value or pyomo variable
+            :param unfix_params: dictionary from parameter name to variable. Either value or pyomo variable
+            :return: expression if pyomo variable or scalar value
+            """
+
+            unfixed_index_params = kwargs.pop('unfixed_index_params', None)
+            unfixed_scalar_params = kwargs.pop('unfixed_scalar_params', None)
+            scale_vars = kwargs.pop('scale_vars', None)
+            smoothing = kwargs.pop('smmothing', False)
+
+            if unfixed_index_params is not None or unfixed_scalar_params is not None:
+                raise NotImplementedError()
+
+            if scale_vars is not None:
+                raise NotImplementedError()
+
+            if not self.is_fully_specified():
+                print(self.get_index_parameters())
+                raise RuntimeError("Missing parameters")
+
+            _scalar_params = self.get_scalar_parameters(with_defaults=True)
+
+            assert self._model().salt is not None, "Salt must be defined in chromatography model"
+
+            # get list components
+            components = self._model().list_components()
+            # determine if salt
+            is_salt = self._model().is_salt(comp_name)
+            salt_name = self._model().salt
+
+            if comp_name == 'free_sites' or is_salt:
+                loop_nosalt = [n for n in components if n != salt_name]
+                q_0 = _scalar_params['sma_lambda']
+                for cname in loop_nosalt:
+                    vj = self.nu(cname)
+                    q_0 -= vj * q_vars[cname]
+
+                if is_salt:
+                    return q_0
+
+                q_0_bar = q_vars[salt_name]
+                for cname in loop_nosalt:
+                    sj = self.sigma(cname)
+                    q_0_bar -= sj * q_vars[cname]
+
+                if comp_name == 'free_sites':
+                    return q_0_bar
+
+            # scale q_0_bar
+            gamma_0_bar = free_sites_var
+
+            if smoothing:
+                eps = 1e-3
+                eps2 = 1e-3
+                # gamma_0_bar = 0.5 * (1 + gamma_0_bar / (gamma_0_bar ** 2 + eps ** 2) ** 0.5) * gamma_0_bar + eps2
+                # c_salt = 0.5 * (1 + c_vars[self.salt] / (c_vars[self.salt] ** 2 + eps ** 2) ** 0.5) * c_vars[self.salt] + eps2
+
+                eps = 1e-4
+                gamma_0_bar = (gamma_0_bar ** 2 + eps) ** 0.5
+                c_salt = (c_vars[self.salt] ** 2 + eps) ** 0.5
+
+            else:
+                c_salt = c_vars[self.salt]
+
+            # adsorption term
+            ka = self.ka(comp_name)
+            vi = self.nu(comp_name)
+            adsorption = ka * c_vars[comp_name] * gamma_0_bar ** vi
+
+            # desorption term
+            kd = self.kd(comp_name)
+            desorption = kd * q_vars[comp_name] * c_salt ** vi
+
+            return adsorption - desorption
+
+        def new_fads(self, comp_name, c_vars, q_vars, **kwargs):
+
+            free_sites = kwargs.pop('fs', None)
+            smoothing = kwargs.pop('smmothing', True)
+
+            no_salt_list = [cname for cname in self.list_components() if not self.is_salt(cname)]
+            if self.is_salt(comp_name):
+                q_salt = self.lamda
+                for n in no_salt_list:
+                    qj = q_vars[n]
+                    q_salt -= self.nu(n) * qj
+                return q_salt - q_vars[comp_name]
+            elif comp_name == 'free_sites':
+                if free_sites is None:
+                    raise RuntimeError('Need to provide fs')
+                else:
+                    q_free_sites = q_vars[self.salt]
+                    for n in no_salt_list:
+                        qj = q_vars[n]
+                        q_free_sites -= self.sigma(n) * qj
+                    return q_free_sites - free_sites
+            else:
+                if free_sites is None:
+                    q_free_sites = self.lamda
+                    for n in no_salt_list:
+                        qj = q_vars[n]
+                        q_free_sites -= (self.nu(n) + self.sigma(n)) * qj
+
+                    if smoothing:
+                        eps = 1e-3
+                        eps2 = 1e-9
+                        q_free_sites = 0.5 * (
+                        1 + q_free_sites / (q_free_sites ** 2 + eps ** 2) ** 0.5) * q_free_sites + eps2
+                        c_salt = 0.5 * (1 + c_vars[self.salt] / (c_vars[self.salt] ** 2 + eps ** 2) ** 0.5) * c_vars[
+                            self.salt] + eps2
+                    else:
+                        c_salt = c_vars[self.salt]
+
+                    ads = self.ka(comp_name) * c_vars[comp_name] * q_free_sites ** self.nu(comp_name)
+                    des = self.kd(comp_name) * q_vars[comp_name] * c_salt ** self.nu(comp_name)
+
+                else:
+                    q_free_sites = free_sites
+                    if smoothing:
+                        eps = 1e-3
+                        eps2 = 1e-9
+                        q_free_sites = 0.5 * (
+                        1 + q_free_sites / (q_free_sites ** 2 + eps ** 2) ** 0.5) * q_free_sites + eps2
+                        c_salt = 0.5 * (1 + c_vars[self.salt] / (c_vars[self.salt] ** 2 + eps ** 2) ** 0.5) * c_vars[
+                            self.salt] + eps2
+                    else:
+                        c_salt = c_vars[self.salt]
+                    ads = self.ka(comp_name) * c_vars[comp_name] * q_free_sites ** self.nu(comp_name)
+                    des = self.kd(comp_name) * q_vars[comp_name] * c_salt ** self.nu(comp_name)
+
+                return ads - des
+
+        @property
+        def lamda(self):
+            return self.get_scalar_parameter('sma_lambda')
+
+        @lamda.setter
+        def lamda(self, value):
+            self.set_scalar_parameter('sma_lambda', value)
 
 
 

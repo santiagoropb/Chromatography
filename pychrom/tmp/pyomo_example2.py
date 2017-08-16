@@ -65,7 +65,7 @@ for t in np.linspace(0.5, 11.0, 20):
     tspan.append(t)
 
 for name in GRM.list_components():
-    nu = 3.5
+    nu = 3.0
     #print(name, nu)
     if nu>0:
         GRM.column.binding_model.set_nu(name, nu)

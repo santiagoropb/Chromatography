@@ -1,0 +1,18 @@
+index parameters:
+  A:
+    eqsma_ke: 0.0
+    eqsma_km: 0.0
+    eqsma_nu: 0.0
+    eqsma_sigma: 0.0
+  B:
+    eqsma_ke: 0.0039
+    eqsma_km: 0.2
+    eqsma_nu: 4.4
+    eqsma_sigma: 10
+  C:
+    eqsma_ke: 0.0077
+    eqsma_km: 0.36666666666666664
+    eqsma_nu: 3.7
+    eqsma_sigma: 12
+scalar parameters:
+  eqsma_lambda: 1200.0

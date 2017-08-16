@@ -11,6 +11,7 @@
 
 \usepackage{listings}
 \usepackage{color}
+\usepackage{rotating}
  
 \definecolor{codegreen}{rgb}{0,0.6,0}
 \definecolor{codegray}{rgb}{0.5,0.5,0.5}
@@ -91,7 +92,7 @@ This technical report describes the work done in chromatography modeling and opt
 Mathematical models for chromatography simulation are typically based on material, energy, and momentum balances, in addition to equations of thermodynamic equilibrium that quantify the distribution of the solutes between different phases. In general, these models require the specification of large set of parameters that help to describe the physics and chemistry of the separation process. The estimation of such parameters is key for a model to obtain accurate predictions. However, obtaining uniquely define parameters for chromatography systems is commonly a very difficult task due to the dimensionality and nonlinearity of the systems. Thus, often models have uncertainty in their parameters. The overall goal of this project is to include such uncertainty in an optimization problem and determine optimal operational conditions that would consider the variability in the parameters of chromatography models. To achieve that the authors propose to leave aside the glorified approach and instead investigate a rigorous optimization approach in which the stochasticity of the parameters can be exploited by the optimization solver. 
 \\
 \\
-For rapid prototyping and testing of ideas towards the goal of robust optimization of chromatography columns, the authors have developed a python package that focuses on flexibility and extensibility. Pychrom, as it was named, focuses on making easy to experiment with chromatography models. The first goal of pychrom is to simulate and optimize chromatography models with different isotherms and different configurations. All modeling of chromatography columns in pychrom can be managed from python. Preprocessing and post-processing is completely done with python objects making pychrom very flexible as it can use other python modules. For instance, running simulations in parallel can be done with few effort by using packages like mpi4py, Scoop, and multiprocessing among other packages. In addition, since all data is managed withing python, initial guesses for a rigorous optimization approach can be obtained by first simulating the chromatography column and then initializing the optimization model with a feasible point all within python. These features aim to facilitate the formulation and solution of an stochastic optimization of a chromatography column. 
+For rapid prototyping and testing of ideas towards the goal of robust optimization of chromatography columns, the authors have developed a python package that focuses on flexibility and extensibility. Pychrom, as it was named, focuses on making easy to experiment with chromatography models. The first goal of pychrom is to simulate and optimize chromatography models with different isotherms and different configurations. All modeling of chromatography columns in pychrom can be managed from python. Preprocessing and post-processing is completely done with python objects making pychrom very flexible as it can use other python modules. For instance, running simulations in parallel can be done with few effort by using packages like mpi4py, Scoop, and multiprocessing among others. In addition, since all data is managed withing python, initial guesses for a rigorous optimization approach can be obtained by first simulating the chromatography column and then initializing the optimization model with a feasible point all within python. These features aim to facilitate the formulation and solution of an stochastic optimization of a chromatography column. 
  
 
 \section{Chromatography models}
@@ -101,7 +102,7 @@ Different types of modeling approaches for chromatography columns are comprehens
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.55\textwidth]{diagramtransport.png}
-\caption{Effects considered in chromatography model. Taken from Smith XX}
+\caption{Effects considered in chromatography model. Taken from Schmidt (2005)}
 \end{figure}
 
 \begin{itemize}
@@ -113,7 +114,7 @@ Different types of modeling approaches for chromatography columns are comprehens
 \item mass transfer from the mobile phase into the boundary layer of the stationary phase
 \end{itemize}
 
-In modeling liquid chromatographic processes, frequently different assumptions can be justified which lead to simplification in the mathematical models. The simplest model, known as the ideal model, neglects dispersion, pore and surface diffusion and mass transfer effects. On the other extreme, the most accurate model, known as the General Rate Model (GRM), consider all the phenomena listed above. In between, several models have been introduced in literature and are known as lumped transport models. Figure XX shows a basic diagram with a high-level classification of chromatography models and its corresponding variables.
+In modeling liquid chromatographic processes, frequently different assumptions can be justified which lead to simplification in the mathematical models. The simplest model, known as the ideal model, neglects dispersion, pore and surface diffusion and mass transfer effects. On the other extreme, the most accurate model, known as the General Rate Model (GRM), consider all the phenomena listed above. In between, several models have been introduced in literature and are known as lumped transport models. Figure \eqref{cmodels} shows a basic diagram with a high-level classification of chromatography models and its corresponding variables.
 
 \begin{figure}[h]
 \centering
@@ -125,6 +126,7 @@ In modeling liquid chromatographic processes, frequently different assumptions c
 Where $C$ represents the concentration vector of all species in the mobile phase, $Cp$ the concentration vector of all species in the pores of the absorbent particles, and $Q$ the concentration vector of species in the particles, also known as loadings. The ideal model takes into account only convective transport and thermodynamics. This model neglects the influence of axial dispersion and all mass transfer effects. Consequently, the loadings and concentrations within the absorbent particles are assumed to be constant and not a function of the particle radius. Furthermore, the concentration in the mobile phase is identical to the concentration in the particle pores. Therefore, for each chemical species in the chromatography column the ideal model introduces two equations
 
 \begin{align}
+\label{idealm}
 & \frac{\partial C}{\partial t} = \left(\frac{\epsilon-1}{\epsilon}\right) \frac{\partial Q}{\partial t}-v\frac{\partial C}{\partial x} \\
 & a \frac{\partial Q}{\partial t} = f_{\text{ads}}(C,Q)
 \end{align}
@@ -183,7 +185,7 @@ present a variety of alternatives to execute the two steps listed above. Some so
 \label{software}
 \centering
 \includegraphics[width=\textwidth]{software.png}
-\caption{Chromatography modeling packages. Taken from Schmidt (2012)}
+\caption{Chromatography modeling packages. Taken from Schmidt (2005)}
 \end{figure}
 For all of the reasons listed above we have created pychrom, a python package for modeling and optimization of chromatography columns. As will be described in the next section, the package was design for easy extensibility and efficient modeling/optimization of chromatography columns.
 
@@ -257,9 +259,129 @@ Then we build different instances with stochasticity in the parameters on differ
 
 \lstinputlisting[language=Python]{mpi_pychrom.py}
 
-In conclusion, driving the chromatography modeling from python open several possibilities to improve our analysis of chromatography results. We are particularly interested in driving an optimization with an interior point method as we will describe in the following section.
+In conclusion, driving the chromatography modeling from python open several possibilities to improve the analysis of chromatography results. We are particularly interested in driving an optimization with an interior point method as we will describe in the following section.
 
 \section{Optimization}
-IN PROGRESS
+
+Despite the significant developments in the mathematical modeling of chromatography separation processes, the selection of operation conditions remains predominantly empirical. As part of the internship we examined the optimization of a preparative ion-exchange chromatography column. In particular, due to the high uncertainty in the parameters of chromatography models. we are interested in investigating a robust optimization approach that could account for the uncertainty in model parameters.  In a deterministic case, the optimization of a separation process is directed towards the following goals:
+
+\begin{itemize}
+\item To separate better (higher resolution),
+\item To separate faster (shorter retention time),
+\item To separate at lower cost (economic effort),
+\item To separate more (higher throughput).
+\end{itemize}
+
+In this study, we first focus on isolating a target component out from a multi-component protein mixture (higher resolution).  In the simplest terms, resolution is the distance between two neighboring chromatographic peaks. Such distance depends on the following factors:
+ 
+\begin{itemize}
+\item The strength of the interaction between the compound and the stationary phase.
+\item If the relevant peaks are sharp or wide, i.e.
+\end{itemize}
+
+In the case of symmetric peaks these two factors can be quantify in terms of the first and second moments of the chromatographic peaks. 
+
+\begin{align*}
+&t_{R,i} = \frac{\int_{0}^{\infty} t \cdot C_i(t)dt}{\int_{0}^{\infty}C_i(t)dt}\\
+&\sigma_{i}^2 = \frac{\int_{0}^{\infty} (t-t_{R,i})^2 \cdot C_i(t)dt}{\int_{0}^{\infty}C_i(t)dt}
+\end{align*}
+
+where $t_{R,i}$ is the retention time of the ith component and $\sigma_i$ its corresponding variance. For asymmetric peaks, one can characterize the resolution as well with the third and fourth moments
+
+\begin{align*}
+&\gamma_{i} = \frac{\int_{0}^{\infty} (\frac{t-t_{R,i}}{\sigma_i})^3 \cdot C_i(t)dt}{\int_{0}^{\infty}C_i(t)dt}\\
+&\kappa_{i} = \frac{\int_{0}^{\infty} (\frac{t-t_{R,i}}{\sigma_i})^4 \cdot C_i(t)dt}{\int_{0}^{\infty}C_i(t)dt}
+\end{align*}
+
+where $\gamma_i$ and $\kappa_i$ are the skewness and kurtosis of the ith peak respectively. To give an example consider a problem with three components. To maximize resolution of the third component from the first and second components, one could maximize the following objective function in terms of the first and second moments. 
+
+\begin{equation}
+f(t_{R},\sigma) = -\sigma_3^{2}+|t_{R,1}-t_{R,3}|+|t_{R,2}-t_{R,3}|  
+\end{equation} 
+
+The idea is to make the third peak as sharp as possible while increasing the distance between itself and the other two components. Since the resolution depends directly on the strength of the interaction between each compound and the stationary phase there are several alternatives for manipulated variables:
+
+\begin{itemize}
+\item Change temperature
+\item Change PH
+\item Change stationary phase
+\item Change concentration of salt (ion-exchange)
+\end{itemize}
+
+In this study we investigate an optimal selection of salt concentration to maximize resolution. We first focus on the deterministic case where parameters are assume to have small uncertainty and then we extend the optimization to deal with uncertainty in some/all of the parameters. Given the time frame for the project, we focus on solving an optimization problem constrained with the ideal model \eqref{idealm} and a single adsorption multi-component isotherm. Recall from section 2 that the numerical solution of the system of equations can be achievable by either partial or total discretization. This followed a simultaneous optimization approach where the PDAE system is completely discretized and the resulting nonlinear optimization problem is send to an interior-point solver.   
+
+\begin{align}
+\label{opt}
+\min_{a_0, a_q} \quad & \sigma_3^{2}-|t_{R,1}-t_{R,3}|-|t_{R,2}-t_{R,3}| \\
+& \frac{\partial C_i}{\partial t} = \left(\frac{\epsilon-1}{\epsilon}\right) \frac{\partial Q_i}{\partial t}-v\frac{\partial C_i}{\partial x}   \qquad \qquad \qquad \forall i \in \left\{0,1,2,3\right\}\\
+& a \frac{\partial Q_i}{\partial t} = f_{\text{ads}}(C,Q) \qquad \qquad \qquad \qquad \qquad \forall i \in \left\{0,1,2,3\right\} \\
+& \frac{dM_{i}}{\partial t} = C_i\qquad \qquad \qquad \qquad \qquad \qquad \qquad \forall i \in \left\{1,2,3\right\}\\
+& \frac{dT_{i}}{\partial t} = t \cdot C_i\qquad \qquad \qquad \qquad \quad\qquad \qquad \forall i \in \left\{1,2,3\right\}\\
+& \frac{dS_{i}}{\partial t} = (t-\sigma_i)^2 \cdot C_i\qquad \qquad \qquad \qquad \qquad \forall i \in \left\{1,2,3\right\}\\
+&C_i(0,x) = C_{init} \qquad \quad \qquad \qquad \qquad \qquad \forall i \in \left\{0,1,2,3\right\}\\
+&Q_i(0,x) = Q_{init} \qquad \quad \qquad \qquad \qquad \qquad \forall i \in \left\{0, 1,2,3\right\}\\
+&M_i(0,x_f) = 0 \qquad \qquad \qquad \qquad \qquad \qquad \forall i \in \left\{1,2,3\right\}\\
+&T_i(0,x_f) = 0 \qquad \qquad \qquad \qquad \qquad \qquad \forall i \in \left\{1,2,3\right\}\\
+&S_i(0,x_f) = 0 \qquad \qquad \qquad \qquad \qquad \qquad \forall i \in \left\{1,2,3\right\}\\
+&C_i(t,x=0) = c_{\text{in}}(t) \qquad \quad \qquad \qquad \qquad \forall i \in \left\{1,2,3\right\}\\
+&t_{R,i}= \frac{T(t_f)}{M(t_f)} \qquad \qquad \qquad \qquad \qquad \qquad \forall i \in \left\{1,2,3\right\}\\
+&\sigma_{i}^2= \frac{S(t_f)}{M(t_f)} \qquad \qquad \qquad \qquad \qquad \qquad \forall i \in \left\{1,2,3\right\}\\
+&C_0(t,x=0) = a_0 +a_1\cdot t \\
+&a_0 \leq a_{0_{ub}} \\
+&a_a \leq a_{1_{ub}}  
+\end{align}
+
+Where $M$, $T$, and $S$ are auxiliary states for the computation of the integrals. The optimization problem was formulated in python with pychrom and pyomo. Pyomo is a Python-based open-source software package that supports among many other capabilities the automatic discretization of differential equations. We used pychrom to query the chromatography model and pyomo to formulate and discretize the spatial and time domain. After the discretization transformation is applied, the optimization problem is send to the interior-point solver IPOPT. The solution is later loaded back to python for analysis and post-processing. Figure \ref{bopt} shows the chromatogram obtained when simulated the system with a given $a_0$ and $a_1$. Note how the three peaks are overlapping which results in low resolution.
+ 
+\begin{figure}[!h]
+\label{bopt}
+\centering
+\includegraphics[width=0.5\textwidth]{bopt.png}
+\caption{Chromatogram before optimization. $a_0=50$ and $a_1=0.2$}
+\end{figure}
+
+When $a_0$ and $a_1$ are chosen with the optimization problem \eqref{opt} the resolution of the third component increases significantly.The python scripts for the optimization are presented in the appendix.
+
+\begin{figure}[!h]
+\label{bopt}
+\centering
+\includegraphics[width=0.5\textwidth]{aopt.png}
+\caption{Chromatogram after optimization. $a_0=28.34$ and $a_1=0.02318$}
+\end{figure}
+
+\subsection{Stochastic optimization}
+Work in progress
+
+
+\begin{thebibliography}{9} 
+\bibitem{einstein} 
+Schmidt-Traub, H. (Ed.). (2005). Preparative chromatography. Weinheim: Wiley-VCH.
+ 
+\bibitem{knuthwebsite} 
+Guiochon, G., Felinger, A., Shirazi, D. G., Katti, A. M. (2006). Fundamentals of preparative and nonlinear chromatography. Boston: Academic Press.
+
+\bibitem{idas}
+Hindmarsh, A.C., Serbian, R., Collier, A. (2006). User documentation for IDA version
+2.5.0. Center for Applied Scientific Computing at Lawrence Livermore National Laboratory.
+
+\bibitem{ipopt}
+A. Wachter and L. T. Biegler, ​On the Implementation of a Primal-Dual Interior Point Filter Line Search Algorithm for Large-Scale Nonlinear Programming, Mathematical Programming 106(1), pp. 25-57, 2006
+
+\bibitem{pyomo}
+Hart, William E., Carl D. Laird, Jean-Paul Watson, David L. Woodruff, Gabriel A. Hackebeil, Bethany L. Nicholson, and John D. Siirola. Pyomo – Optimization Modeling in Python. Second Edition.  Vol. 67. Springer, 2017.
+
+\end{thebibliography}
+\newpage
+\section{Appendix}
+
+\begin{sidewaysfigure}[ht]
+\centering
+\includegraphics[width=\textwidth]{uml.png}
+\caption{Pychrom classes}
+\end{sidewaysfigure}
+
+\lstinputlisting[language=Python]{testing_utils.py}
+\lstinputlisting[language=Python]{pyomo_example3.py}
+
 %%% End document
 \end{document}

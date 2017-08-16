@@ -43,8 +43,8 @@ class SmoothFunction(object):
         m.s = pe.Var(initialize=0.0, bounds=(0.0, None))
         n_points = self._n_points
 
-        start = self._start + 0.6*(self._b-self._start)
-        end = self._b + 0.4*(self._end-self._b)
+        start = self._start + 0.5*(self._b-self._start)
+        end = self._b + 0.5*(self._end-self._b)
         data_p = np.linspace(start,
                              end,
                              n_points)

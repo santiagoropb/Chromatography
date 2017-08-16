@@ -520,8 +520,9 @@ class IdealConvectiveColumn(ConvectionModel):
         binding = self._column.binding_model
 
         def rule_adsorption(m, s, t, x):
-            if t == m.t.first():
-                return pe.Constraint.Skip
+            if binding.is_kinetic:
+                if t == m.t.first():
+                    return pe.Constraint.Skip
 
             c_var = dict()
             q_var = dict()
@@ -549,8 +550,9 @@ class IdealConvectiveColumn(ConvectionModel):
         salt_name = self._column.salt
 
         def rule_adsorption(m, s, t, x):
-            if t == m.t.first():
-                return pe.Constraint.Skip
+            if binding.is_kinetic:
+                if s != salt_name and t == m.t.first():
+                    return pe.Constraint.Skip
 
             c_var = dict()
             q_var = dict()
@@ -597,11 +599,18 @@ class IdealConvectiveColumn(ConvectionModel):
 
         super().build_initial_conditions(**kwargs)
 
+        binding = self._column.binding_model
+        salt_name = self._column.salt
+
         def rule_init_q(m, s, x):
-            return m.Q[s, 0.0, x] == self._column.init_q(s)
+            if binding.is_kinetic:
+                if s == salt_name:
+                    return pe.Constraint.Skip
+                return m.Q[s, 0.0, x] == self._column.init_q(s)
+            else:
+                return pe.Constraint.Skip
 
         self.m.init_q = pe.Constraint(self.m.s, self.m.x, rule=rule_init_q)
-
 
     def initialize_variables(self, trajectories=None):
 
@@ -745,8 +754,9 @@ class IdealDispersiveColumn(DispersionModel):
         binding = self._column.binding_model
 
         def rule_adsorption(m, s, t, x):
-            if t == m.t.first():
-                return pe.Constraint.Skip
+            if binding.is_kinetic:
+                if t == m.t.first():
+                    return pe.Constraint.Skip
 
             c_var = dict()
             q_var = dict()
@@ -774,8 +784,9 @@ class IdealDispersiveColumn(DispersionModel):
         salt_name = self._column.salt
 
         def rule_adsorption(m, s, t, x):
-            if t == m.t.first():
-                return pe.Constraint.Skip
+            if binding.is_kinetic:
+                if s != salt_name and t == m.t.first():
+                    return pe.Constraint.Skip
 
             c_var = dict()
             q_var = dict()
@@ -822,8 +833,16 @@ class IdealDispersiveColumn(DispersionModel):
 
         super().build_initial_conditions(**kwargs)
 
+        binding = self._column.binding_model
+        salt_name = self._column.salt
+
         def rule_init_q(m, s, x):
-            return m.Q[s, 0.0, x] == self._column.init_q(s)
+            if binding.is_kinetic:
+                if s == salt_name:
+                    return pe.Constraint.Skip
+                return m.Q[s, 0.0, x] == self._column.init_q(s)
+            else:
+                return pe.Constraint.Skip
 
         self.m.init_q = pe.Constraint(self.m.s, self.m.x, rule=rule_init_q)
 
@@ -880,6 +899,7 @@ class IdealDispersiveColumn(DispersionModel):
 
         return result_set
 
+
 class OptimalConvectiveColumn(ConvectionModel):
 
     def __init__(self, column):
@@ -910,109 +930,6 @@ class OptimalConvectiveColumn(ConvectionModel):
                       index_radius=False)
         if isinstance(self._column.binding_model, SMABinding):
             define_free_sites_vars(self.m, scale_vars=True, index_radius=False)
-
-        n_moments = kwargs.pop('n_moments', 1)
-
-        bm = self._column.binding_model
-        no_salt_list = [cname for cname in self.m.s if not bm.is_salt(cname)]
-        if n_moments >= 1:
-            """
-            # defines states for total concentrations
-            self.m.Cts = pe.Var(no_salt_list, self.m.t, initialize=1.0)
-            self.m.dCts = dae.DerivativeVar(self.m.Cts, wrt=self.m.t)
-
-            def rule_total_concentration(m, s, t):
-                if t == m.t.first():
-                    return pe.Constraint.Skip
-                return m.dCts[s, t] == m.C[s, t, m.x.last()]
-
-            self.m.c_integral = pe.Constraint(no_salt_list, self.m.t, rule=rule_total_concentration)
-
-            def init_cts_rule(m, s):
-                return m.Cts[s, m.t.first()] == 0.0
-
-            self.m.init_cts = pe.Constraint(no_salt_list, rule=init_cts_rule)
-            """
-            # defines states for retention times integral
-            self.m.Trs = pe.Var(no_salt_list, self.m.t, initialize=1.0)
-            self.m.dTrs = dae.DerivativeVar(self.m.Trs, wrt=self.m.t)
-
-            def rule_total_time(m, s, t):
-                if t == m.t.first():
-                    return pe.Constraint.Skip
-                return m.dTrs[s, t] == m.C[s, t, m.x.last()] * t
-
-            self.m.t_ode = pe.Constraint(no_salt_list, self.m.t, rule=rule_total_time)
-
-            def init_trs_rule(m, s):
-                return m.Trs[s, m.t.first()] == 0.0
-
-            self.m.init_trs = pe.Constraint(no_salt_list, rule=init_trs_rule)
-
-            # retention times variable
-            self.m.mean_t = pe.Var(no_salt_list, initialize=1.0)
-
-            def rule_retention(m, s):
-                return 10.0 * m.mean_t[s] == m.Trs[s, m.t.last()]
-
-            self.m.retention = pe.Constraint(no_salt_list, rule=rule_retention)
-
-        if n_moments >= 2:
-
-            # defines states for standard deviation
-            self.m.sigmas = pe.Var(no_salt_list, self.m.t)
-            self.m.dsigmas = dae.DerivativeVar(self.m.sigmas, wrt=self.m.t)
-
-            def rule_sigmas(m, s, t):
-                if t == m.t.first():
-                    return pe.Constraint.Skip
-                return m.dsigmas[s, t] == m.C[s, t, m.x.last()] * (t - m.mean_t[s]) ** 2
-
-            self.m.sigma_ode = pe.Constraint(no_salt_list, self.m.t, rule=rule_sigmas)
-
-            def init_sigmas_rule(m, s):
-                return m.sigmas[s, m.t.first()] == 0.0
-
-            self.m.init_sigmas = pe.Constraint(no_salt_list, rule=init_sigmas_rule)
-
-            # retention times variable
-            self.m.variance_t = pe.Var(no_salt_list, initialize=1.0)
-
-            def rule_variance(m, s):
-                return 10.0 * m.variance_t[s] == m.sigmas[s, m.t.last()]
-
-            self.m.variance = pe.Constraint(no_salt_list, rule=rule_variance)
-
-        if n_moments ==3:
-
-            # defines states for standard deviation
-            self.m.skews = pe.Var(no_salt_list, self.m.t)
-            self.m.dskews = dae.DerivativeVar(self.m.skews, wrt=self.m.t)
-
-            def rule_skews(m, s, t):
-                if t == m.t.first():
-                    return pe.Constraint.Skip
-                eps = 1e-4
-                std = (m.variance_t[s] ** 2 + eps) ** 0.5
-                return m.dskews[s, t] == m.C[s, t, m.x.last()] * ((t - m.mean_t[s]) / std) ** 3
-
-            self.m.skew_integral = pe.Constraint(no_salt_list, self.m.t, rule=rule_skews)
-
-            def init_skew_rule(m, s):
-                return m.skews[s, m.t.first()] == 0.0
-
-            self.m.init_skews = pe.Constraint(no_salt_list, rule=init_skew_rule)
-
-            # skew variable
-            self.m.skew_t = pe.Var(no_salt_list, initialize=1.0)
-
-            def rule_skewness(m, s):
-                return 10.0 * m.skew_t[s] == m.skews[s, m.t.last()]
-
-            self.m.skewness = pe.Constraint(no_salt_list, rule=rule_skewness)
-
-        if n_moments > 3:
-            raise RuntimeError("The number of moments needs to be less or equal to 3")
 
     def build_mobile_phase_balance(self, **kwargs):
         """
@@ -1062,8 +979,9 @@ class OptimalConvectiveColumn(ConvectionModel):
         binding = self._column.binding_model
 
         def rule_adsorption(m, s, t, x):
-            if t == m.t.first():
-                return pe.Constraint.Skip
+            if binding.is_kinetic:
+                if t == m.t.first():
+                    return pe.Constraint.Skip
 
             c_var = dict()
             q_var = dict()
@@ -1091,8 +1009,9 @@ class OptimalConvectiveColumn(ConvectionModel):
         salt_name = self._column.salt
 
         def rule_adsorption(m, s, t, x):
-            if t == m.t.first():
-                return pe.Constraint.Skip
+            if binding.is_kinetic:
+                if s != salt_name and t == m.t.first():
+                    return pe.Constraint.Skip
 
             c_var = dict()
             q_var = dict()
@@ -1129,56 +1048,22 @@ class OptimalConvectiveColumn(ConvectionModel):
         :return: None
         """
 
-        #super().build_boundary_conditions(**kwargs)
-
         inlet_functions = self.create_inlet_functions()
         lin = self.m.x.first()
-
-        bm = self._column.binding_model
-        no_salt_list = [cname for cname in self.m.s if not bm.is_salt(cname)]
-
-        if len(no_salt_list) == len(self.m.s):
-            salt_name = "no_salt_name"
-        else:
-            sno = set(no_salt_list)
-            sw = set(list(self.m.s))
-            ns = sw.difference(sno)
-            salt_name = ns.pop()
+        binding = self._column.binding_model
+        salt_name = self._column.salt
 
         def rule_inlet_bc(m, s, tt):
             if tt == m.t.first():
                 return pe.Constraint.Skip
-            if bm.is_salt(s):
-                return 50.0 <= m.C[s, tt, lin] <= 80.0
-
             lhs = m.C[s, tt, lin]
             rhs = inlet_functions[s](s, tt)
             return lhs == rhs
 
-        self.m.inlet = pe.Constraint(self.m.s,
+        no_salt_list = [cname for cname in self.m.s if cname!=salt_name]
+        self.m.inlet = pe.Constraint(no_salt_list,
                                      self.m.t,
                                      rule=rule_inlet_bc)
-
-    def build_objective(self):
-        bm = self._column.binding_model
-        no_salt_list = [cname for cname in self.m.s if not bm.is_salt(cname)]
-        if isinstance(bm, SMABinding):
-            # combination of components into tuples
-            combined_components = list(combinations(no_salt_list, 2))
-            n_combinations = len(combined_components)
-            self.m.resolution = pe.Var(combined_components)
-            self.m.list_resolutions = pe.ConstraintList()
-
-            obj = 0.0
-            for i, p in enumerate(combined_components):
-                s1 = p[0]
-                s2 = p[1]
-                eps = 1e-5
-                w1 = 4 * (self.m.variance_t[s1] ** 2 + eps) ** 0.5
-                w2 = 4 * (self.m.variance_t[s2] ** 2 + eps) ** 0.5
-                self.m.list_resolutions.add(self.m.resolution[p] == 2.0 * (self.m.mean_t[s1] - self.m.mean_t[s2]) / (w1 + w2))
-                obj -= self.m.resolution[p]**2
-            self.m.obj = pe.Objective(expr=obj)
 
     def build_initial_conditions(self, **kwargs):
         """
@@ -1188,8 +1073,16 @@ class OptimalConvectiveColumn(ConvectionModel):
 
         super().build_initial_conditions(**kwargs)
 
+        binding = self._column.binding_model
+        salt_name = self._column.salt
+
         def rule_init_q(m, s, x):
-            return m.Q[s, 0.0, x] == self._column.init_q(s)
+            if binding.is_kinetic:
+                if s == salt_name:
+                    return pe.Constraint.Skip
+                return m.Q[s, 0.0, x] == self._column.init_q(s)
+            else:
+                return pe.Constraint.Skip
 
         self.m.init_q = pe.Constraint(self.m.s, self.m.x, rule=rule_init_q)
 
@@ -1247,17 +1140,7 @@ class OptimalConvectiveColumn(ConvectionModel):
                                           'col_loc',
                                           'par_loc'])
 
-        if hasattr(self.m, 'mean_t'):
-            result_set.mean_t = dict()
-            for k, v in self.m.mean_t.items():
-                result_set.mean_t[k] = v.value
-        if hasattr(self.m, 'variance_t'):
-            result_set.variance_t = dict()
-            for k, v in self.m.variance_t.items():
-                result_set.variance_t[k] = v.value
-        if hasattr(self.m, 'skew_t'):
-            result_set.skew_t = dict()
-            for k, v in self.m.skew_t.items():
-                result_set.skew_t[k] = v.value
-
         return result_set
+
+    def build_objective(self):
+        pass
