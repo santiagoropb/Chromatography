@@ -387,7 +387,7 @@ class CasadiColumn(object):
                 self.m.ode[i] = ca.substitute(expr, ca.vertcat(*old_expr), ca.vertcat(*new_expr))
             for i, expr in enumerate(self.m.alg_eq):
                 self.m.alg_eq[i] = ca.substitute(expr, ca.vertcat(*old_expr), ca.vertcat(*new_expr))
-
+        """
         print("STATES")
         for i, v in enumerate(self.m.states):
             print(v, self.m.ode[i], self.m.state_ic[i])
@@ -395,7 +395,7 @@ class CasadiColumn(object):
         print("ALGEBRAICS")
         for i, v in enumerate(self.m.algebraics):
             print(v, self.m.alg_eq[i], self.m.algebraic_ic[i])
-
+        """
         return self.m
 
     def store_values_in_data_set(self, solution, store_ders=True):

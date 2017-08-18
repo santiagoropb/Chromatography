@@ -96,7 +96,7 @@ for t in m.t:
 m.slope.fixed = False
 m.bconc.fixed = False
 m.obj.activate()
-results = modeler.solve(solver_opts=options)
+#results = modeler.solve(solver_opts=options)
 
 for cname in no_salt_list:
     print(cname, pe.value(m.mean_t[cname]),
@@ -134,5 +134,8 @@ plt.ylabel("Salt Concentration")
 plt.ylim([None,500])
 plt.show()
 
-
+for cname in results.components:
+    to_plot = results.Q.sel(component=cname)
+    to_plot.plot(cmap=plt.cm.gist_ncar)
+    plt.show()
 

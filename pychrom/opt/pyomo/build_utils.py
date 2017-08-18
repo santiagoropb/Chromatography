@@ -227,7 +227,7 @@ class PyomoColumn(object):
         def rule_inlet_bc(m, i, j):
             if j == m.t.first():
                 return pe.Constraint.Skip
-            lhs = m.C[i, j, self.m.x.first()]
+            lhs = m.C[i, j, m.x.first()]
             rhs = inlet_functions[i](i, j/t_scale)
             return lhs == rhs
 
@@ -236,7 +236,7 @@ class PyomoColumn(object):
 
         # define initial condition c
         def rule_init_c(m, i, k):
-            t0 = self.m.t.first()
+            t0 = m.t.first()
             return m.C[i, t0, k] == self._column.init_c(i)
 
         self.m.ic_c = pe.Constraint(self.m.s, self.m.x,
